@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- plum (design appIcon.colors iconBg): the night room; no other factory app uses it -->
+    <color name="ic_launcher_background">#FF4A2D5E</color>
+</resources>

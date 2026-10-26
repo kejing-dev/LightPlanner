@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">灯光布点</string>
+    <string name="lang_code">zh</string>
+
+    <string name="title">灯光布点</string>
+    <string name="title_hole_open">开孔图已打开</string>
+    <string name="action_settings">设置</string>
+    <string name="action_done">完成</string>
+    <string name="action_delete">删除这盏</string>
+    <string name="action_back">返回</string>
+    <string name="action_close">关闭</string>
+    <string name="disclaimer">直射估算 · 相对亮度</string>
+    <string name="status_lamps">%1$d 盏 · 层高 %2$s</string>
+    <string name="status_lamps_manual">%1$d 盏 · 层高 %2$s · 手动</string>
+    <string name="status_lamps_no_ceiling">%1$d 盏 · 层高 ?</string>
+    <string name="hint_empty">看向想照亮的地方，捏一下</string>
+    <string name="hint_planning">捏一盏灯可以改它，捏别处再放一盏</string>
+    <string name="hint_stick">摇杆左右微调位置</string>
+    <string name="btn_heat">亮度图</string>
+    <string name="btn_hole">开孔图</string>
+    <string name="legend_title">暗 · 偏暗 · 合适 · 偏亮</string>
+    <string name="legend_note">直射估算，实际会更亮一些</string>
+
+    <string name="loading">准备中…</string>
+    <string name="welcome_title">这是布灯草图工具</string>
+    <string name="welcome_body">只算直射光，显示相对亮度，不是照度计</string>
+    <string name="welcome_look">抬头</string>
+    <string name="welcome_pinch">捏一下</string>
+    <string name="welcome_sit">坐过去看</string>
+    <string name="action_start">开始</string>
+    <string name="finding_title">抬头看看天花板，再低头扫一眼桌子和沙发</string>
+    <string name="finding_ceiling">天花板</string>
+    <string name="finding_floor">地面</string>
+    <string name="finding_furniture">家具 %1$d 块</string>
+    <string name="no_ceiling_title">没找到天花板</string>
+    <string name="no_ceiling_tip1">把灯打开</string>
+    <string name="no_ceiling_tip2">慢慢抬头扫一圈</string>
+    <string name="no_ceiling_tip3">斜顶、很高的天花板可能识别不了</string>
+    <string name="action_retry">再试一次</string>
+    <string name="action_manual_height">手动设层高</string>
+    <string name="manual_title">层高</string>
+    <string name="action_use_this">用这个</string>
+    <string name="mismatch_title">找不到上次的房间</string>
+    <string name="mismatch_body">锚点可能还没恢复，或者换了房间</string>
+    <string name="action_look_again">再找找</string>
+    <string name="action_restart">重新开始</string>
+    <string name="restart_confirm">清空上次的 %1$d 盏灯？</string>
+    <string name="action_cancel">取消</string>
+    <string name="action_clear">清空</string>
+    <string name="permission_title">需要空间感知权限才能找到天花板和家具</string>
+    <string name="action_grant">去授权</string>
+    <string name="lost_title">位置跟丢了，看看四周</string>
+
+    <string name="lamp_title">第 %1$d 盏</string>
+    <string name="beam_spot">聚光</string>
+    <string name="beam_narrow">窄光</string>
+    <string name="beam_std">常用</string>
+    <string name="beam_flood">泛光</string>
+    <string name="beam_explain_accent">%1$d° · 重点照明，照一点</string>
+    <string name="beam_explain_general">%1$d° · 基础照明，照一片</string>
+    <string name="output_s">小 5 W</string>
+    <string name="output_m">中 7 W</string>
+    <string name="output_l">大 10 W</string>
+    <string name="cct_2700">暖 2700</string>
+    <string name="cct_3000">3000</string>
+    <string name="cct_4000">中性 4000</string>
+    <string name="lamp_distances">离墙 %1$s · 离最近一盏 %2$s</string>
+    <string name="lamp_distances_wall">离墙 %1$s</string>
+    <string name="lamp_distances_none">再捏一处放下一盏</string>
+    <string name="dragging">拖动中 · 离墙 %1$s</string>
+
+    <string name="bar_deleted">已删除第 %1$d 盏</string>
+    <string name="action_undo">撤销</string>
+    <string name="bar_max">最多 16 盏，可以先删掉一盏</string>
+    <string name="bar_no_furniture">没识别到桌子或沙发，光斑先落在地面</string>
+    <string name="bar_restored">上次的 %1$d 盏灯已放回</string>
+    <string name="bar_restored_partial">有 %1$d 盏按记录位置放回，请看一眼</string>
+    <string name="bar_ceiling_found">识别到天花板 %1$s</string>
+    <string name="action_use_detected">改用</string>
+
+    <string name="settings_title">设置</string>
+    <string name="lang_system">跟随系统</string>
+    <string name="lang_zh">中文</string>
+    <string name="lang_en">English</string>
+    <string name="lang_en_short">EN</string>
+    <string name="show_spacing">显示间距线</string>
+    <string name="clear_plan">清空方案</string>
+    <string name="clear_confirm">清空全部 %1$d 盏灯？</string>
+    <string name="about">关于</string>
+    <string name="about_body">v%1$s · 只算直射光，显示相对亮度</string>
+
+    <string name="hole_title">开孔图</string>
+    <string name="hole_ceiling">层高 %1$s</string>
+    <string name="hole_rule">经验参考：离墙约半个间距</string>
+    <string name="hole_col_no">编号</string>
+    <string name="hole_col_beam">光束角</string>
+    <string name="hole_col_watt">亮度</string>
+    <string name="hole_col_cct">色温</string>
+    <string name="hole_col_wall">离墙</string>
+    <string name="hole_note">现场用卷尺复核，误差约 ±3 cm · 用系统截图保存</string>
+
+    <string name="kind_desk">桌子</string>
+    <string name="kind_coffee">茶几</string>
+    <string name="kind_sofa">沙发</string>
+    <string name="kind_bed">床</string>
+    <string name="kind_floor">地面</string>
+    <string name="kind_other">台面</string>
+    <string name="grade_dark">暗</string>
+    <string name="grade_dim">偏暗</string>
+    <string name="grade_ok">合适</string>
+    <string name="grade_bright">偏亮</string>
+    <string name="grade_uneven">不均</string>
+    <string name="line_dark_gap">中间会暗</string>
+    <string name="wall_close_short">离墙太近</string>
+    <string name="wall_edge_short">墙边会暗</string>
+</resources>

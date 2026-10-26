@@ -1,0 +1,124 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Light Planner</string>
+    <string name="lang_code">en</string>
+
+    <!-- main panel -->
+    <string name="title">Light Planner</string>
+    <string name="title_hole_open">Hole plan is open</string>
+    <string name="action_settings">Settings</string>
+    <string name="action_done">Done</string>
+    <string name="action_delete">Delete this lamp</string>
+    <string name="action_back">Back</string>
+    <string name="action_close">Close</string>
+    <string name="disclaimer">Direct light estimate · relative brightness</string>
+    <string name="status_lamps">%1$d lamps · ceiling %2$s</string>
+    <string name="status_lamps_manual">%1$d lamps · ceiling %2$s · manual</string>
+    <string name="status_lamps_no_ceiling">%1$d lamps · ceiling ?</string>
+    <string name="hint_empty">Look at the spot you want lit, pinch</string>
+    <string name="hint_planning">Pinch a lamp to change it, pinch elsewhere for another</string>
+    <string name="hint_stick">Stick left / right nudges the lamp</string>
+    <string name="btn_heat">Brightness map</string>
+    <string name="btn_hole">Hole plan</string>
+    <string name="legend_title">Dark · Dim · Good · Bright</string>
+    <string name="legend_note">Direct estimate; the real room will be a little brighter</string>
+
+    <!-- setup states -->
+    <string name="loading">Getting ready…</string>
+    <string name="welcome_title">A sketch tool for downlights</string>
+    <string name="welcome_body">Direct light only, relative brightness, not a light meter.</string>
+    <string name="welcome_look">Look up</string>
+    <string name="welcome_pinch">Pinch</string>
+    <string name="welcome_sit">Sit and see</string>
+    <string name="action_start">Start</string>
+    <string name="finding_title">Look up at the ceiling, then down at the desk and sofa</string>
+    <string name="finding_ceiling">Ceiling</string>
+    <string name="finding_floor">Floor</string>
+    <string name="finding_furniture">Furniture %1$d</string>
+    <string name="no_ceiling_title">No ceiling found</string>
+    <string name="no_ceiling_tip1">Turn the lights on</string>
+    <string name="no_ceiling_tip2">Look up slowly and sweep around</string>
+    <string name="no_ceiling_tip3">Sloped or very high ceilings may not be detected</string>
+    <string name="action_retry">Try again</string>
+    <string name="action_manual_height">Set height by hand</string>
+    <string name="manual_title">Ceiling height</string>
+    <string name="action_use_this">Use this</string>
+    <string name="mismatch_title">Can’t find last time’s room</string>
+    <string name="mismatch_body">Anchors may still be loading, or this is another room</string>
+    <string name="action_look_again">Look again</string>
+    <string name="action_restart">Start over</string>
+    <string name="restart_confirm">Clear last time’s %1$d lamps?</string>
+    <string name="action_cancel">Cancel</string>
+    <string name="action_clear">Clear</string>
+    <string name="permission_title">Spatial awareness permission is needed to find the ceiling and furniture</string>
+    <string name="action_grant">Grant</string>
+    <string name="lost_title">Lost position · look around</string>
+
+    <!-- lamp panel -->
+    <string name="lamp_title">Lamp %1$d</string>
+    <string name="beam_spot">Spot</string>
+    <string name="beam_narrow">Narrow</string>
+    <string name="beam_std">Std</string>
+    <string name="beam_flood">Flood</string>
+    <string name="beam_explain_accent">%1$d° · accent, lights one spot</string>
+    <string name="beam_explain_general">%1$d° · general, lights an area</string>
+    <string name="output_s">Low 5 W</string>
+    <string name="output_m">Mid 7 W</string>
+    <string name="output_l">High 10 W</string>
+    <string name="cct_2700">2700 K</string>
+    <string name="cct_3000">3000 K</string>
+    <string name="cct_4000">4000 K</string>
+    <string name="lamp_distances">Wall %1$s · nearest lamp %2$s</string>
+    <string name="lamp_distances_wall">Wall %1$s</string>
+    <string name="lamp_distances_none">Pinch another spot for the next lamp</string>
+    <string name="dragging">Moving · wall %1$s</string>
+
+    <!-- inline bars -->
+    <string name="bar_deleted">Lamp %1$d deleted</string>
+    <string name="action_undo">Undo</string>
+    <string name="bar_max">Up to 16 lamps · delete one first</string>
+    <string name="bar_no_furniture">No desk or sofa found · pools fall on the floor</string>
+    <string name="bar_restored">Last time’s %1$d lamps are back</string>
+    <string name="bar_restored_partial">%1$d lamps put back from records · please check</string>
+    <string name="bar_ceiling_found">Ceiling found %1$s</string>
+    <string name="action_use_detected">Use it</string>
+
+    <!-- settings -->
+    <string name="settings_title">Settings</string>
+    <string name="lang_system">Follow system</string>
+    <string name="lang_zh">中文</string>
+    <string name="lang_en">English</string>
+    <string name="lang_en_short">EN</string>
+    <string name="show_spacing">Show spacing lines</string>
+    <string name="clear_plan">Clear plan</string>
+    <string name="clear_confirm">Clear all %1$d lamps?</string>
+    <string name="about">About</string>
+    <string name="about_body">v%1$s · direct light only, relative brightness</string>
+
+    <!-- hole plan -->
+    <string name="hole_title">Hole plan</string>
+    <string name="hole_ceiling">Ceiling %1$s</string>
+    <string name="hole_rule">Rule of thumb: about half a spacing from the wall</string>
+    <string name="hole_col_no">No.</string>
+    <string name="hole_col_beam">Beam</string>
+    <string name="hole_col_watt">Power</string>
+    <string name="hole_col_cct">Colour</string>
+    <string name="hole_col_wall">To walls</string>
+    <string name="hole_note">Check with a tape on site, about ±3 cm · save with a system screenshot</string>
+
+    <!-- 3D labels -->
+    <string name="kind_desk">Desk</string>
+    <string name="kind_coffee">Coffee table</string>
+    <string name="kind_sofa">Sofa</string>
+    <string name="kind_bed">Bed</string>
+    <string name="kind_floor">Floor</string>
+    <string name="kind_other">Surface</string>
+    <string name="grade_dark">Dark</string>
+    <string name="grade_dim">Dim</string>
+    <string name="grade_ok">Good</string>
+    <string name="grade_bright">Bright</string>
+    <string name="grade_uneven">Uneven</string>
+    <string name="line_dark_gap">dark in between</string>
+    <string name="wall_close_short">Too close to the wall</string>
+    <string name="wall_edge_short">Dark by the wall</string>
+</resources>

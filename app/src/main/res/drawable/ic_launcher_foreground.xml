@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Launcher foreground (108 x 108, content inside the 66 dp safe zone; design appIcon.glyph): a ceiling
+     line with a half-round downlight hanging from it, and a flattened ellipse of light on the floor below.
+     No cone line: the stacking alone reads as "lamp, light falls". Same shapes as tools/make_icon.py. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- ceiling line -->
+    <path android:fillColor="#FFFFD58A" android:pathData="M30,30h48v3.2h-48z" />
+    <!-- half-round downlight under the ceiling -->
+    <path android:fillColor="#FFFFD58A" android:pathData="M43,33.2h22a11,11 0,0 1,-22 0z" />
+    <!-- the light pool on the floor (70 %) -->
+    <path android:fillColor="#B3FFD58A" android:pathData="M54,72m-21,0a21,8.5 0,1 0,42 0a21,8.5 0,1 0,-42 0" />
+</vector>
