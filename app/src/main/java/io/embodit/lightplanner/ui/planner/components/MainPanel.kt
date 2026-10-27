@@ -62,7 +62,7 @@ private val KeyW = 52.dp
 private val Radius = 28.dp
 
 /**
- * The corner panel (design `panels.main`, 400 x 340 dp at 0.65 m): the setup states (S00 / S01 / S02 /
+ * The main panel (design `panels.main`, 400 x 400 dp drawn 1.25x at 0.85 m, 15 degrees under the horizon; 0.1.1): the setup states (S00 / S01 / S02 /
  * S12 / S13 / S16), the plan view (S03 / S04 / S07 / S08 title row) and the lamp view (S05 / S06). The
  * inline bar sits on its own row above the resident disclaimer line (design R1-6).
  */
@@ -249,7 +249,11 @@ private fun ColumnScope.PlanView(state: PlannerUiState, onEvent: (PlannerEvent) 
         Text(text = rs(if (holeOpen) R.string.title_hole_open else R.string.title), color = ink, style = LpType.title, maxLines = 1, modifier = Modifier.weight(1f).probe("title"))
         Key(name = "settings", icon = R.drawable.ic_settings, description = rs(R.string.action_settings), enabled = true) { onEvent(PlannerEvent.SettingsClicked) }
     }
-    Text(text = statusLine(state), color = grey, style = LpType.status, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.probe("status"))
+    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(text = statusLine(state), color = grey, style = LpType.status, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f).probe("status"))
+        // the colour the next lamp gets (it inherits the last selected lamp's)
+        if (!holeOpen) LightChip(state.lastParams.cct, modifier = Modifier.probe("next_light"))
+    }
     if (state.heat) {
         Legend()
     } else {
@@ -271,6 +275,7 @@ private fun statusLine(state: PlannerUiState): String {
     val h = state.ceilingHeight
     return when {
         h == null -> rs(R.string.status_lamps_no_ceiling, n)
+        state.virtualRoom != null -> rs(R.string.status_lamps_virtual, n, Units.m(h))
         state.room.ceilingIsManual -> rs(R.string.status_lamps_manual, n, Units.m(h))
         else -> rs(R.string.status_lamps, n, Units.m(h))
     }
@@ -302,7 +307,9 @@ private fun ColumnScope.LampView(state: PlannerUiState, onEvent: (PlannerEvent) 
     val dragging = state.dragging != null
     val width = (PanelSizes.MAIN_W - 32f).dp
     Row(modifier = Modifier.fillMaxWidth().height(RowH), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(text = rs(R.string.lamp_title, lamp.no), color = ink, style = LpType.title, maxLines = 1, modifier = Modifier.weight(1f).probe("lamp_title"))
+        Text(text = rs(R.string.lamp_title, lamp.no), color = ink, style = LpType.title, maxLines = 1, modifier = Modifier.probe("lamp_title"))
+        LightChip(lamp.cct, modifier = Modifier.probe("lamp_light"))
+        Spacer(modifier = Modifier.weight(1f))
         Key(name = "delete", icon = R.drawable.ic_trash, description = rs(R.string.action_delete), enabled = !dragging) { onEvent(PlannerEvent.DeleteClicked) }
         Key(name = "done", icon = R.drawable.ic_check, description = rs(R.string.action_done), enabled = !dragging, accent = true) { onEvent(PlannerEvent.DoneClicked) }
     }
@@ -320,9 +327,13 @@ private fun ColumnScope.LampView(state: PlannerUiState, onEvent: (PlannerEvent) 
         Segments(items = Output.entries, selected = lamp.output, width = width, enabled = !dragging, name = { "output_${it.tag}" }, onSelect = { onEvent(PlannerEvent.OutputSelected(it)) }) { o ->
             Text(text = rs(when (o) { Output.S -> R.string.output_s; Output.M -> R.string.output_m; Output.L -> R.string.output_l }), color = ink, style = LpType.segment, maxLines = 1, softWrap = false)
         }
-        Segments(items = Cct.entries, selected = lamp.cct, width = width, enabled = !dragging, name = { "cct_${it.tag}" }, onSelect = { onEvent(PlannerEvent.CctSelected(it)) }) { c ->
-            Text(text = rs(when (c) { Cct.K2700 -> R.string.cct_2700; Cct.K3000 -> R.string.cct_3000; Cct.K4000 -> R.string.cct_4000 }), color = ink, style = LpType.segment, maxLines = 1, softWrap = false)
+        Segments(items = Cct.WHITES, selected = lamp.cct, width = width, enabled = !dragging, name = { "cct_${it.tag}" }, onSelect = { onEvent(PlannerEvent.CctSelected(it)) }) { c ->
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                Dot(c, 8.dp)
+                Text(text = lightShort(c), color = ink, style = LpType.segment, maxLines = 1, softWrap = false)
+            }
         }
+        Swatches(selected = lamp.cct, enabled = !dragging) { onEvent(PlannerEvent.CctSelected(it)) }
     }
     Spacer(modifier = Modifier.weight(1f))
     val info = state.light.info(lamp.id)
@@ -338,6 +349,46 @@ private fun ColumnScope.LampView(state: PlannerUiState, onEvent: (PlannerEvent) 
     Text(text = line, color = ink, style = LpType.status, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.probe("lamp_distances"))
     Text(text = rs(R.string.hint_stick), color = grey, style = LpType.label, maxLines = 1, modifier = Modifier.probe("hint_stick"))
     Footer(state, onEvent)
+}
+
+// ---- light colour ------------------------------------------------------------------------------
+
+/** A round dot in the light's own colour. */
+@Composable
+private fun Dot(cct: Cct, size: Dp) {
+    Box(modifier = Modifier.size(size).clip(CircleShape).background(LpColors.pool(cct)))
+}
+
+/** "● 暖白 3000 K": the light colour at a glance (0.1.1). */
+@Composable
+private fun LightChip(cct: Cct, modifier: Modifier = Modifier) {
+    Row(
+        modifier = modifier.height(28.dp).clip(CircleShape).background(PicoTheme.colorScheme.fillTertiary).padding(horizontal = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Dot(cct, 12.dp)
+        Text(text = lightName(cct), color = PicoTheme.colorScheme.labelPrimary, style = LpType.label, maxLines = 1, overflow = TextOverflow.Ellipsis)
+    }
+}
+
+/** The colour row under the colour temperatures: five round swatches for RGB downlights. */
+@Composable
+private fun Swatches(selected: Cct, enabled: Boolean, onSelect: (Cct) -> Unit) {
+    Row(modifier = Modifier.fillMaxWidth().height(40.dp).padding(start = 4.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        Text(text = rs(R.string.cct_colour_label), color = PicoTheme.colorScheme.labelSecondary, style = LpType.label, maxLines = 1, modifier = Modifier.width(56.dp))
+        Cct.COLOURS.forEach { c ->
+            val on = c == selected
+            IconButton(
+                onClick = { if (enabled) onSelect(c) },
+                modifier = Modifier.probe("cct_${c.tag}"),
+                enabled = enabled,
+                shape = CircleShape,
+                colors = IconButtonDefaults.iconButtonColors(containerColor = LpColors.pool(c), contentColor = LpColors.TapeInk),
+                size = IconButtonDefaults.iconButtonSize(width = 48.dp, height = 36.dp),
+            ) { if (on) Icon(painter = painterResource(R.drawable.ic_check), contentDescription = lightName(c), modifier = Modifier.size(20.dp), tint = LpColors.TapeInk) }
+        }
+    }
 }
 
 // ---- footer: inline bar + disclaimer -------------------------------------------------------------
@@ -360,6 +411,7 @@ private fun InlineBarRow(bar: InlineBar, onEvent: (PlannerEvent) -> Unit) {
             BarKind.RESTORED -> Triple(rs(R.string.bar_restored, bar.n), null, null)
             BarKind.RESTORED_PARTIAL -> Triple(rs(R.string.bar_restored_partial, bar.n), null, null)
             BarKind.CEILING_FOUND -> Triple(rs(R.string.bar_ceiling_found, Units.m(bar.value)), rs(R.string.action_use_detected), PlannerEvent.UseDetectedCeiling as PlannerEvent)
+            BarKind.VIRTUAL_ROOM -> Triple(rs(R.string.bar_virtual_room), null, null)
         }
     Row(
         modifier = Modifier.fillMaxWidth().height(36.dp).clip(RoundedCornerShape(18.dp)).background(PicoTheme.colorScheme.fillTertiary).padding(start = 12.dp, end = 4.dp).probe("bar"),

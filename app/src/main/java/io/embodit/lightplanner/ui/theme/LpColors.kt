@@ -40,11 +40,13 @@ object LpColors {
     val TapeInk = Color(0xFF16181C) // design-style: fixed-figma-color tapeInk: content on the semantic fills
     val StaleGrey = Color(0xFF9A9A96) // design-style: fixed-figma-color staleGrey: tracking lost
 
+    /** The light's colour on glass and in the room: the design's three warm tokens, the rest from [Cct.rgb]. */
     fun pool(cct: Cct): Color =
         when (cct) {
             Cct.K2700 -> PoolWarm2700
             Cct.K3000 -> PoolWarm3000
             Cct.K4000 -> PoolNeutral4000
+            else -> Color(cct.rgb[0], cct.rgb[1], cct.rgb[2])
         }
 
     /** The 4-step legend colour of a grade (design `semantic.亮度图`). */

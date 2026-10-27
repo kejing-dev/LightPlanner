@@ -24,6 +24,7 @@ import io.embodit.lightplanner.domain.Lamp
 import io.embodit.lightplanner.domain.LightMath
 import io.embodit.lightplanner.domain.LineKind
 import io.embodit.lightplanner.domain.P2
+import io.embodit.lightplanner.domain.PanelRest
 import io.embodit.lightplanner.domain.PlaneSurface
 import io.embodit.lightplanner.domain.Quat4
 import io.embodit.lightplanner.domain.RoomModel
@@ -110,6 +111,7 @@ class PlannerScene(private val sink: (PlannerEvent) -> Unit) {
     private var paused = false
     private var ui = PlannerUiState()
     private var strings: SceneStrings? = null
+    private var stringsZh: SceneStrings? = null
     private var pose = HeadPose(Vec3.ZERO, Quat4.IDENTITY)
     private var hasHead = false
     private var frames = 0L
@@ -192,9 +194,9 @@ class PlannerScene(private val sink: (PlannerEvent) -> Unit) {
 
         val rig = PanelRig(root) { id, shown -> panelShown[id] = shown }
         this.rig = rig
-        rig.world(PanelIds.MAIN, PanelSizes.MAIN_W, PanelSizes.MAIN_H, 1f)
-        rig.world(PanelIds.SETTINGS, PanelSizes.SETTINGS_W, PanelSizes.SETTINGS_H, 1f)
-        rig.world(PanelIds.HOLE, PanelSizes.HOLE_W, PanelSizes.HOLE_H, 1f)
+        rig.world(PanelIds.MAIN, PanelSizes.MAIN_W, PanelSizes.MAIN_H, PANEL_SCALE)
+        rig.world(PanelIds.SETTINGS, PanelSizes.SETTINGS_W, PanelSizes.SETTINGS_H, PANEL_SCALE)
+        rig.world(PanelIds.HOLE, PanelSizes.HOLE_W, PanelSizes.HOLE_H, PANEL_SCALE)
         head.start()
         stick.start()
         LpGraph.anchors.start()
@@ -234,7 +236,7 @@ class PlannerScene(private val sink: (PlannerEvent) -> Unit) {
         val colliders = RoomColliders(root)
         colliders.buildBackstop()
         this.colliders = colliders
-        colliders.sync(planes.all)
+        colliders.sync(ui.room.planes)
         yield()
         select = SelectView(root, meshes, m)
         reticle = ReticleView(root, meshes, m)
@@ -255,7 +257,6 @@ class PlannerScene(private val sink: (PlannerEvent) -> Unit) {
         val ok =
             runCatching {
                 planes.start {
-                    colliders?.sync(planes.all)
                     sink(PlannerEvent.PlanesChanged(RoomModel(planes.all.toList())))
                 }
             }
@@ -353,8 +354,10 @@ class PlannerScene(private val sink: (PlannerEvent) -> Unit) {
         LpLog.i("SCENE detached")
     }
 
-    fun setStrings(s: SceneStrings) {
+    /** [s] in the UI language for every label; [zh] for the furniture names, which lead in Chinese (0.1.1). */
+    fun setStrings(s: SceneStrings, zh: SceneStrings) {
         strings = s
+        stringsZh = zh
         tagPlates.values.forEach { it.hide() }
         if (built) render(ui)
     }
@@ -376,6 +379,8 @@ class PlannerScene(private val sink: (PlannerEvent) -> Unit) {
         val meshes = meshes ?: return
         if (state.popup == Popup.NONE && lastPopup != Popup.NONE) popupClosedMs = SystemClock.elapsedRealtime()
         lastPopup = state.popup
+        // pinch targets follow the room the ViewModel uses: scanned planes plus the virtual room's (taste profile D7)
+        if (state.room.planes !== before.room.planes) colliders?.sync(state.room.planes)
         val showRoom = state.inPlan && !state.trackingLost
         val ids = if (showRoom) state.lamps.map { it.id }.toSet() else emptySet()
         for (id in lampViews.keys.filter { it !in ids }) lampViews.remove(id)?.destroy()
@@ -432,18 +437,21 @@ class PlannerScene(private val sink: (PlannerEvent) -> Unit) {
         for (id in layerViews.keys.filter { it !in seen }) layerViews.remove(id)?.destroy()
         // tags over furniture
         val st = strings
+        val zh = stringsZh ?: st
         val tagged = HashSet<String>()
-        if (st != null) {
+        if (st != null && zh != null) {
             for (rc in state.room.receivers) {
                 if (!rc.kind.tagged || tagged.size >= TAG_SLOTS) continue
                 val g = light.grade(rc.id) ?: continue
                 tagged += rc.id
                 val plate = tagPlates.getOrPut(rc.id) { TextPlate(root, meshes, m, work, "tag:${rc.id.take(8)}") }
                 val sameKind = state.room.receivers.filter { it.kind == rc.kind }
-                val name = if (sameKind.size > 1) "${st.kind(rc.kind)} ${sameKind.indexOf(rc) + 1}" else st.kind(rc.kind)
-                val text = "$name · ${st.grade(g.grade)}"
+                val no = if (sameKind.size > 1) " ${sameKind.indexOf(rc) + 1}" else ""
+                val text = "${zh.kind(rc.kind)}$no · ${zh.grade(g.grade)}"
+                val local = "${st.kind(rc.kind)}$no · ${st.grade(g.grade)}"
+                val sub = local.takeIf { it != text }
                 val color = gradeColor(g.grade)
-                plate.content("$text|${g.grade}") { Plates.tag(text, g.grade, color) }
+                plate.content("$text|$sub|${g.grade}") { Plates.tag(text, sub, g.grade, color) }
                 val c = rc.plane.centroid
                 plate.place(Vec3(c.x, rc.y + Dims.TAG_ABOVE, c.z), Dims.TAG_H)
             }
@@ -716,26 +724,18 @@ class PlannerScene(private val sink: (PlannerEvent) -> Unit) {
     // panels
     // =========================================================================================
 
-    /** The main panel's rest pose (design `spatialLayout.panel.anchor`): 0.65 m, 22 degrees left, 20 down, adjusted when looking up or down. */
+    /**
+     * The main panel's rest pose from the current head position and yaw (taste profile D9 / D10, 0.1.1): 0.85 m
+     * ahead, 15 degrees under the horizon whatever the gaze pitch, so it is never above the eyes (0.1.0 followed
+     * the gaze up to the ceiling and the user had to look up). Its centre sits 15 degrees left so the reticle
+     * straight ahead stays free; looking down at a desk it parks further to the side at the same height.
+     */
     private fun restMain(h: HeadPose): Vec3 {
-        val pitch = gazePitchDeg(h)
-        val (yawLeft, pitchDeg) =
-            when {
-                pitch > LOOK_UP_DEG -> MAIN_LEFT_DEG to (pitch - 25f) // looking at the ceiling: 25 degrees under the gaze, never on the ceiling
-                pitch < -LOOK_DOWN_DEG -> SIDE_LEFT_DEG to (pitch + 15f) // looking at the desk: parked to the side, not over the pool
-                else -> MAIN_LEFT_DEG to -MAIN_DOWN_DEG
-            }
-        return restAt(h, yawLeft, pitchDeg, MAIN_M)
+        val yawLeft = if (gazePitchDeg(h) < -LOOK_DOWN_DEG) SIDE_LEFT_DEG else MAIN_LEFT_DEG
+        return restAt(h, yawLeft, -MAIN_DOWN_DEG, MAIN_M)
     }
 
-    private fun restAt(h: HeadPose, leftDeg: Float, upDeg: Float, dist: Float): Vec3 {
-        val f = h.level()
-        val l = Math.toRadians(leftDeg.toDouble()).toFloat()
-        val u = Math.toRadians(upDeg.coerceIn(-80f, 80f).toDouble()).toFloat()
-        val left = P2(f.z, -f.x)
-        val d = (f * cos(l) + left * sin(l)).normalized()
-        return h.position + d.at(0f) * (dist * cos(u)) + Vec3(0f, dist * sin(u), 0f)
-    }
+    private fun restAt(h: HeadPose, leftDeg: Float, upDeg: Float, dist: Float): Vec3 = PanelRest.at(h, leftDeg, upDeg, dist)
 
     private fun gazePitchDeg(h: HeadPose): Float = Math.toDegrees(asin(h.forward.y.coerceIn(-1f, 1f).toDouble())).toFloat()
 
@@ -746,18 +746,19 @@ class PlannerScene(private val sink: (PlannerEvent) -> Unit) {
         val hold = state.popup != Popup.NONE || now - lastPanelPressMs < KEY_HOLD_MS || drag != null
         mainFollow.step(pose, now, hold)?.let { mainSlot.moveTo(it) }
         val facing = FacePanel.facing(mainSlot.position, pose.position, null)
-        val mw = PanelSizes.MAIN_W * DP_M
-        val mh = PanelSizes.MAIN_H * DP_M
+        val mw = PanelSizes.MAIN_W * DP_M * PANEL_SCALE
+        val mh = PanelSizes.MAIN_H * DP_M * PANEL_SCALE
         when (state.popup) {
             Popup.SETTINGS -> {
-                val sw = PanelSizes.SETTINGS_W * DP_M
-                val sh = PanelSizes.SETTINGS_H * DP_M
-                rig[PanelIds.SETTINGS]?.show(mainSlot.position + facing.right * (mw / 2f + sw / 2f + 0.02f) + facing.up * ((mh - sh) / 2f) + facing.normal * 0.01f)
+                val sw = PanelSizes.SETTINGS_W * DP_M * PANEL_SCALE
+                val sh = PanelSizes.SETTINGS_H * DP_M * PANEL_SCALE
+                rig[PanelIds.SETTINGS]?.show(mainSlot.position + facing.right * (mw / 2f + sw / 2f + 0.025f) + facing.up * ((mh - sh) / 2f) + facing.normal * 0.01f)
             }
             Popup.HOLE_PLAN -> {
-                val hw = PanelSizes.HOLE_W * DP_M
-                val hh = PanelSizes.HOLE_H * DP_M
-                rig[PanelIds.HOLE]?.show(mainSlot.position + facing.right * (mw / 2f + hw / 2f + 0.02f) + facing.up * ((hh - mh) / 2f + 0.02f) + facing.normal * 0.01f)
+                val hw = PanelSizes.HOLE_W * DP_M * PANEL_SCALE
+                val hh = PanelSizes.HOLE_H * DP_M * PANEL_SCALE
+                // top-aligned with the main panel: the taller hole plan grows downwards, never above the eyes (D10)
+                rig[PanelIds.HOLE]?.show(mainSlot.position + facing.right * (mw / 2f + hw / 2f + 0.025f) + facing.up * ((mh - hh) / 2f) + facing.normal * 0.01f)
             }
             Popup.NONE -> Unit
         }
@@ -783,7 +784,7 @@ class PlannerScene(private val sink: (PlannerEvent) -> Unit) {
     private fun planeOf(entity: Entity?): PlaneSurface? {
         if (entity == null) return null
         val id = colliders?.planeOf(entity) ?: return null
-        return planes.all.firstOrNull { it.id == id }
+        return ui.room.planes.firstOrNull { it.id == id }
     }
 
     fun onSpatialTap(value: SpatialTapValue) {
@@ -972,11 +973,13 @@ class PlannerScene(private val sink: (PlannerEvent) -> Unit) {
     private fun fmt(v: Float) = String.format(Locale.US, "%.3f", v)
 
     companion object {
-        const val MAIN_LEFT_DEG = 22f
-        const val MAIN_DOWN_DEG = 20f
-        const val SIDE_LEFT_DEG = 35f
-        const val MAIN_M = 0.65f
-        const val LOOK_UP_DEG = 25f
+        const val MAIN_LEFT_DEG = 20f
+        const val MAIN_DOWN_DEG = 15f
+        const val SIDE_LEFT_DEG = 38f
+        const val MAIN_M = 0.85f
+
+        /** 0.85 m instead of 0.65 m: panels are drawn 1.1x (about the 0.1.0 angular size; 1.25x covered the furniture tag straight ahead). */
+        const val PANEL_SCALE = 1.1f
         const val LOOK_DOWN_DEG = 35f
         const val KEY_HOLD_MS = 600L
         const val DRAG_START_M = 0.01f
@@ -1049,7 +1052,9 @@ internal class PanelFollow(private val name: String, private val rest: (HeadPose
         val gazePitch = Math.toDegrees(asin(head.forward.y.coerceIn(-1f, 1f).toDouble())).toFloat()
         val pitchAway = gazePitch - panelPitch
         val out = yawAway > YAW_WINDOW_DEG || pitchAway > UP_WINDOW_DEG || pitchAway < -DOWN_WINDOW_DEG || dist < 0.3f || dist > 1.2f
-        if (!out || hold) {
+        // already where it would slide to (the side park sits outside the yaw window): nothing to do
+        val atRest = current.distanceTo(rest(head)) < AT_REST_M
+        if (!out || hold || atRest) {
             outSinceMs = NEVER
         } else if (outSinceMs == NEVER) {
             outSinceMs = nowMs
@@ -1074,7 +1079,9 @@ internal class PanelFollow(private val name: String, private val rest: (HeadPose
         private const val OUT_MS = 600L
         private const val SLIDE_MS = 400f
         private const val YAW_WINDOW_DEG = 30f
-        private const val UP_WINDOW_DEG = 45f
+        private const val AT_REST_M = 0.12f
+        // the rest height no longer depends on the gaze pitch, so looking up at the ceiling never moves the panel
+        private const val UP_WINDOW_DEG = 180f
         private const val DOWN_WINDOW_DEG = 55f
     }
 }

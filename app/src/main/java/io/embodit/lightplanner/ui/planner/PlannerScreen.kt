@@ -20,6 +20,7 @@ import com.pico.spatial.ui.platform.SpatialSoundEffect
 import io.embodit.lightplanner.platform.LpLog
 import io.embodit.lightplanner.ui.planner.components.LocalLpResources
 import io.embodit.lightplanner.ui.planner.components.PlannerStage
+import io.embodit.lightplanner.domain.LanguagePref
 import io.embodit.lightplanner.ui.planner.components.SceneStrings
 import io.embodit.lightplanner.ui.planner.components.localizedResources
 import io.embodit.lightplanner.ui.planner.debug.Probe
@@ -39,7 +40,7 @@ fun PlannerScreen() {
         Probe.enabled = (context.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0
         true
     }
-    val scene = remember(viewModel) { PlannerScene(viewModel::onEvent) }
+    val scene = remember(viewModel) { PlannerScene(viewModel::onEvent).also { s -> viewModel.head = s::headPose } }
     val lifecycle = LocalLifecycleOwner.current.lifecycle
 
     DisposableEffect(scene, lifecycle) {
@@ -94,7 +95,7 @@ fun PlannerScreen() {
 
     // the in-app language switches at run time: panels and the 3D labels read their copy from this
     val resources = remember(state.settings.language, context) { localizedResources(context, state.settings.language) }
-    LaunchedEffect(resources, scene) { scene.setStrings(SceneStrings.from(resources)) }
+    LaunchedEffect(resources, scene) { scene.setStrings(SceneStrings.from(resources), SceneStrings.from(localizedResources(context, LanguagePref.ZH))) }
     CompositionLocalProvider(LocalLpResources provides resources) {
         PlannerStage(state = state, scene = scene, onEvent = viewModel::onEvent)
     }

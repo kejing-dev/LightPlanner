@@ -62,9 +62,22 @@
     <string name="output_s">小 5 W</string>
     <string name="output_m">中 7 W</string>
     <string name="output_l">大 10 W</string>
-    <string name="cct_2700">暖 2700</string>
+    <string name="cct_2700">2700</string>
     <string name="cct_3000">3000</string>
-    <string name="cct_4000">中性 4000</string>
+    <string name="cct_4000">4000</string>
+    <string name="cct_5000">5000</string>
+    <string name="cct_6500">6500</string>
+    <string name="cct_colour_label">彩色</string>
+    <string name="light_2700">暖白 2700 K</string>
+    <string name="light_3000">暖白 3000 K</string>
+    <string name="light_4000">中性白 4000 K</string>
+    <string name="light_5000">日光白 5000 K</string>
+    <string name="light_6500">冷白 6500 K</string>
+    <string name="light_red">红光</string>
+    <string name="light_amber">琥珀光</string>
+    <string name="light_green">绿光</string>
+    <string name="light_blue">蓝光</string>
+    <string name="light_violet">紫光</string>
     <string name="lamp_distances">离墙 %1$s · 离最近一盏 %2$s</string>
     <string name="lamp_distances_wall">离墙 %1$s</string>
     <string name="lamp_distances_none">再捏一处放下一盏</string>
@@ -114,4 +127,12 @@
     <string name="line_dark_gap">中间会暗</string>
     <string name="wall_close_short">离墙太近</string>
     <string name="wall_edge_short">墙边会暗</string>
+    <string name="bar_virtual_room">没扫到天花板 · 先用虚拟房间，设置里可调</string>
+    <string name="virtual_room">虚拟房间</string>
+    <string name="virtual_width">宽 %1$s</string>
+    <string name="virtual_depth">长 %1$s</string>
+    <string name="virtual_height">高 %1$s</string>
+    <string name="virtual_use">改用虚拟房间</string>
+    <string name="virtual_recenter">移到我面前</string>
+    <string name="status_lamps_virtual">%1$d 盏 · 虚拟房间 层高 %2$s</string>
 </resources>

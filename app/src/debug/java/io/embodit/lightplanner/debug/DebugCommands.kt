@@ -34,7 +34,7 @@ import java.util.Locale
  * `drag` s="<no> <dx> <dz> [hold]" · `place` a=x,z · `heat` s=on|off · `hole` · `settings` · `ui` s=control ·
  * `stick` a=x,ms · `lang` s=system|zh|en · `noCeiling` s=on|off · `noSurface` s=on|off · `trackingLost` s=on|off ·
  * `mismatch` · `noPermission` · `restore` · `clear` · `bar` s=long|normal · `pools` s=tex|disc · `flipv` s=on|off ·
- * `hidemode` s=auto|park. Reading back: `state` (no s) · `dump` · `pose` · `panels` · `planes` · `layers` · `bounds`.
+ * `hidemode` s=auto|park · `virtual` s=on|off|recenter|size a=dw,dd,dh. Reading back: `state` (no s) · `dump` · `pose` · `panels` · `planes` · `layers` · `bounds`.
  */
 internal object DebugCommands {
     private val main = Handler(Looper.getMainLooper())
@@ -73,6 +73,14 @@ internal object DebugCommands {
             "stick" -> LpLog.i("CMD ${scene.debugStick(nums.getOrNull(0) ?: 0f, (nums.getOrNull(1) ?: 1000f).toLong())}")
             "lang" -> LanguagePref.entries.firstOrNull { it.tag == s }?.let { vm.onEvent(PlannerEvent.LanguageSelected(it)) }
             "noCeiling", "no_ceiling" -> LpGraph.planes.hideCeiling = s != "off"
+            // taste profile D7 (0.1.1): on = switch to the virtual room now; recenter; size=w,d,h deltas in metres
+            "virtual" ->
+                when (words.getOrNull(0)) {
+                    "recenter" -> vm.onEvent(PlannerEvent.VirtualRoomRecenter)
+                    "size" -> vm.onEvent(PlannerEvent.VirtualRoomResize(nums.getOrNull(0) ?: 0f, nums.getOrNull(1) ?: 0f, nums.getOrNull(2) ?: 0f))
+                    "off" -> vm.onEvent(PlannerEvent.UseDetectedCeiling)
+                    else -> vm.onEvent(PlannerEvent.VirtualRoomUse)
+                }
             "noSurface", "no_surface" -> vm.debugSet { it.copy(debugNoSurface = s != "off") }
             "trackingLost", "lost" -> LpGraph.head.forceLost = s != "off"
             "mismatch" -> vm.debugMismatch()

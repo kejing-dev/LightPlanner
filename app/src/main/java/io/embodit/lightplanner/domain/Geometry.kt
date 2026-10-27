@@ -269,3 +269,18 @@ data class PlaneSurface(val id: String, val semantic: String, val vertices: List
 
 /** Result of a ray / surface intersection. [normal] faces the ray origin. */
 data class SurfaceHit(val point: Vec3, val normal: Vec3, val distance: Float, val plane: PlaneSurface)
+
+/**
+ * Where a panel rests (taste profile D9 / D10): from the head's current position and yaw (pitch and roll ignored),
+ * [leftDeg] to the left, [upDeg] above the horizon (negative = below), [dist] metres away.
+ */
+object PanelRest {
+    fun at(h: HeadPose, leftDeg: Float, upDeg: Float, dist: Float): Vec3 {
+        val f = h.level()
+        val l = Math.toRadians(leftDeg.toDouble()).toFloat()
+        val u = Math.toRadians(upDeg.coerceIn(-80f, 80f).toDouble()).toFloat()
+        val left = P2(f.z, -f.x)
+        val d = (f * cos(l) + left * sin(l)).normalized()
+        return h.position + d.at(0f) * (dist * cos(u)) + Vec3(0f, dist * sin(u), 0f)
+    }
+}

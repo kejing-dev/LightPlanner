@@ -9,6 +9,7 @@ import io.embodit.lightplanner.domain.LightResult
 import io.embodit.lightplanner.domain.Output
 import io.embodit.lightplanner.domain.PlaneSurface
 import io.embodit.lightplanner.domain.RoomModel
+import io.embodit.lightplanner.domain.VirtualRoom
 import io.embodit.lightplanner.domain.Settings
 import io.embodit.lightplanner.domain.Vec3
 
@@ -26,6 +27,8 @@ enum class BarKind(val sticky: Boolean) {
     RESTORED(false),
     RESTORED_PARTIAL(false),
     CEILING_FOUND(true),
+    /** The scan found no ceiling within 5 s: the virtual room is in use (taste profile D7, 0.1.1). */
+    VIRTUAL_ROOM(false),
 }
 
 data class InlineBar(val kind: BarKind, val id: Int, val n: Int = 0, val value: Float = 0f)
@@ -66,6 +69,8 @@ data class PlannerUiState(
     val holdLoading: Boolean = false,
     /** Debug: furniture counts as absent (S17). */
     val debugNoSurface: Boolean = false,
+    /** The stand-in room while the scan has no ceiling (taste profile D7); null when the scanned room is used. */
+    val virtualRoom: VirtualRoom? = null,
 ) {
     val inPlan: Boolean
         get() = phase == Phase.PLAN
@@ -187,6 +192,15 @@ sealed interface PlannerEvent {
     data object UseManualHeight : PlannerEvent
 
     data object UseDetectedCeiling : PlannerEvent
+
+    /** Settings: use the virtual room instead of the scan (taste profile D7). */
+    data object VirtualRoomUse : PlannerEvent
+
+    /** Settings: change the virtual room's width / depth / height by these metres. */
+    data class VirtualRoomResize(val dWidth: Float, val dDepth: Float, val dHeight: Float) : PlannerEvent
+
+    /** Settings: rebuild the virtual room around the current head position and yaw (profile D9). */
+    data object VirtualRoomRecenter : PlannerEvent
 
     data object MismatchRetry : PlannerEvent
 

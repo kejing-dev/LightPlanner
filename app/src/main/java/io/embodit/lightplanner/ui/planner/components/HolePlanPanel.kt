@@ -177,7 +177,7 @@ private fun HoleTable(state: PlannerUiState, modifier: Modifier) {
                     Cell(l.no.toString(), 56.dp, ink)
                     Cell("${beamName(l.beam)} ${l.beam.deg.toInt()}°", 96.dp, ink)
                     Cell("${l.output.watts} W", 96.dp, ink)
-                    Cell("${l.cct.kelvin} K", 96.dp, ink)
+                    Cell(if (l.cct.white) "${l.cct.kelvin} K" else lightName(l.cct), 96.dp, ink)
                     Text(text = info?.wallDistances?.joinToString(" · ") { Units.cm(it.first) } ?: "–", color = ink, style = LpType.label, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
                 }
             }

@@ -24,7 +24,9 @@ import com.pico.spatial.core.math.Color4
 import com.pico.spatial.core.math.Quat
 import com.pico.spatial.core.math.Vector2
 import com.pico.spatial.core.math.Vector3
+import io.embodit.lightplanner.domain.Billboard
 import io.embodit.lightplanner.domain.Cct
+import io.embodit.lightplanner.domain.LayerQuad
 import io.embodit.lightplanner.domain.LineKind
 import io.embodit.lightplanner.domain.PlaneSurface
 import io.embodit.lightplanner.domain.Quat4
@@ -143,9 +145,6 @@ internal class SharedResources {
  */
 internal class LpMaterials(private val shared: SharedResources) {
     val plaster: Material = unlit(LpColors.LampPlaster, twoSided = true)
-    val glow2700: Material = unlit(LpColors.PoolWarm2700, twoSided = true)
-    val glow3000: Material = unlit(LpColors.PoolWarm3000, twoSided = true)
-    val glow4000: Material = unlit(LpColors.PoolNeutral4000, twoSided = true)
     val stale: Material = unlit(LpColors.StaleGrey, twoSided = true)
     val amber: Material = unlit(LpColors.Interaction, twoSided = true)
     val amberSheer: Material = sheer(LpColors.Interaction, 0.75f)
@@ -157,19 +156,18 @@ internal class LpMaterials(private val shared: SharedResources) {
     val reticle: Material = sheer(LpColors.White, 0.85f)
     val reticleDash: Material = sheer(LpColors.White, 0.6f)
     val reticleBad: Material = sheer(LpColors.Error, 0.9f)
-    val cone2700: Material = cone(LpColors.PoolWarm2700)
-    val cone3000: Material = cone(LpColors.PoolWarm3000)
-    val cone4000: Material = cone(LpColors.PoolNeutral4000)
     val snapGuide: Material = sheer(LpColors.Interaction, 0.9f)
-    val poolDisc2700: Material = sheer(LpColors.PoolWarm2700, 0.35f)
-    val poolDisc3000: Material = sheer(LpColors.PoolWarm3000, 0.35f)
-    val poolDisc4000: Material = sheer(LpColors.PoolNeutral4000, 0.35f)
 
-    fun glow(cct: Cct): Material = when (cct) { Cct.K2700 -> glow2700; Cct.K3000 -> glow3000; Cct.K4000 -> glow4000 }
+    // one material per light colour (0.1.1: ten colours), made on first use and shared like the rest
+    private val glows = HashMap<Cct, Material>()
+    private val cones = HashMap<Cct, Material>()
+    private val poolDiscs = HashMap<Cct, Material>()
 
-    fun cone(cct: Cct): Material = when (cct) { Cct.K2700 -> cone2700; Cct.K3000 -> cone3000; Cct.K4000 -> cone4000 }
+    fun glow(cct: Cct): Material = glows.getOrPut(cct) { unlit(LpColors.pool(cct), twoSided = true) }
 
-    fun poolDisc(cct: Cct): Material = when (cct) { Cct.K2700 -> poolDisc2700; Cct.K3000 -> poolDisc3000; Cct.K4000 -> poolDisc4000 }
+    fun cone(cct: Cct): Material = cones.getOrPut(cct) { cone(LpColors.pool(cct)) }
+
+    fun poolDisc(cct: Cct): Material = poolDiscs.getOrPut(cct) { sheer(LpColors.pool(cct), 0.35f) }
 
     fun line(kind: LineKind): Material = when (kind) { LineKind.OK -> lineOk; LineKind.DARK_GAP -> lineDark; LineKind.ACCENT -> lineAccent }
 
@@ -244,23 +242,21 @@ internal object MeshFactory {
     }
 
     /**
-     * A unit square in the local XZ plane (centred, facing +Y) with UVs: u runs with +X, v with +Z
-     * ([flipV] mirrors v). The light layers: texel (ix, iz) of a field lands at that cell.
+     * A unit square in the local XZ plane (centred, facing +Y), corners and UVs from [LayerQuad]: the light layers'
+     * texel (ix, iz) lands at that cell. [legacy] is the 0.1.0 mapping (mirrored along Z), kept for `flipv on`.
      */
-    fun unitSquare(name: String, flipV: Boolean = false): MeshResource {
-        val positions = listOf(Vector3(-0.5f, 0f, -0.5f), Vector3(0.5f, 0f, -0.5f), Vector3(0.5f, 0f, 0.5f), Vector3(-0.5f, 0f, 0.5f))
-        val v0 = if (flipV) 1f else 0f
-        val v1 = if (flipV) 0f else 1f
-        val uv = listOf(Vector2(0f, v0), Vector2(1f, v0), Vector2(1f, v1), Vector2(0f, v1))
+    fun unitSquare(name: String, legacy: Boolean = false): MeshResource {
+        val positions = LayerQuad.CORNERS.map { it.sdk() }
+        val uv = LayerQuad.uv(legacy).map { (u, v) -> Vector2(u, v) }
         val model = MeshModel(positions = positions, triangleIndices = listOf(0, 2, 1, 0, 3, 2), normals = List(4) { UP }, uv0 = uv)
         return MeshResource.createWithMeshModel(model = model, bounds = BoundingBox(center = Vector3(0f, 0f, 0f), halfExtent = Vector3(0.5f, 0.001f, 0.5f)), name = name)
     }
 
-    /** A unit quad in the local XY plane facing +Z with UVs (u right, v down from the top): label plates. */
+    /** A unit quad in the local XY plane facing +Z: label plates, corners and UVs from [Billboard] (v = 1 on top, the engine's convention). */
     fun unitQuad(name: String): MeshResource {
-        val positions = listOf(Vector3(-0.5f, -0.5f, 0f), Vector3(0.5f, -0.5f, 0f), Vector3(0.5f, 0.5f, 0f), Vector3(-0.5f, 0.5f, 0f))
-        val uv = listOf(Vector2(0f, 1f), Vector2(1f, 1f), Vector2(1f, 0f), Vector2(0f, 0f))
-        val model = MeshModel(positions = positions, triangleIndices = listOf(0, 1, 2, 0, 2, 3), normals = List(4) { FRONT }, uv0 = uv)
+        val positions = Billboard.CORNERS.map { it.sdk() }
+        val uv = Billboard.UV.map { (u, v) -> Vector2(u, v) }
+        val model = MeshModel(positions = positions, triangleIndices = Billboard.TRIANGLES, normals = List(4) { FRONT }, uv0 = uv)
         return MeshResource.createWithMeshModel(model = model, bounds = BoundingBox(center = Vector3(0f, 0f, 0f), halfExtent = Vector3(0.5f, 0.5f, 0.001f)), name = name)
     }
 
@@ -360,7 +356,7 @@ internal class LpMeshes(private val shared: SharedResources) {
         listOf(
             { cube = shared.keep(MeshFactory.unitCube("unitCube")) },
             { square = shared.keep(MeshFactory.unitSquare("unitSquare")) },
-            { squareFlipped = shared.keep(MeshFactory.unitSquare("unitSquareFlipped", flipV = true)) },
+            { squareFlipped = shared.keep(MeshFactory.unitSquare("unitSquareLegacy", legacy = true)) },
             { quad = shared.keep(MeshFactory.unitQuad("unitQuad")) },
             { band = shared.keep(MeshFactory.unitBand("unitBand")) },
             { dashes = shared.keep(MeshFactory.unitBand("unitDashes", dashes = 12)) },
@@ -468,8 +464,8 @@ internal class Strip(parent: Entity, mesh: MeshResource, material: Material, nam
 
 /**
  * A bitmap-textured quad in the room (design `entities3d`: lamp numbers, surface tags, spacing labels),
- * [heightM] tall, turned about the vertical towards the viewer every frame. The bitmap is re-made
- * only when its text changes.
+ * [heightM] tall per line of [Plates.LINE_PX] pixels (a two-line tag is twice as tall), turned about the
+ * vertical towards the viewer every frame. The bitmap is re-made only when its text changes.
  */
 internal class TextPlate(parent: Entity, meshes: LpMeshes, private val materials: LpMaterials, private val queue: WorkQueue, name: String) {
     private val material: UnlitMaterial = materials.textured(soft = false)
@@ -477,6 +473,7 @@ internal class TextPlate(parent: Entity, meshes: LpMeshes, private val materials
     private var texture: TextureResource? = null
     private var key: String? = null
     private var aspect = 1f
+    private var lines = 1f
     private var heightM = 0.03f
     private var center = Vec3.ZERO
 
@@ -491,6 +488,7 @@ internal class TextPlate(parent: Entity, meshes: LpMeshes, private val materials
         queue.enqueue(this) {
             val bitmap = paint()
             aspect = bitmap.width.toFloat() / bitmap.height.toFloat()
+            lines = bitmap.height.toFloat() / Plates.LINE_PX
             val old = texture
             val tex = runCatching { TextureResource.create(bitmap) }.onFailure { LpLog.e("PLATE texture failed: $it", it) }.getOrNull()
             if (tex != null) {
@@ -513,15 +511,12 @@ internal class TextPlate(parent: Entity, meshes: LpMeshes, private val materials
         this.heightM = heightM
     }
 
-    /** Per frame: yaw towards [viewer], no pitch, no roll (design `spatialLayout.surfaces.tags`). */
+    /** Per frame: yaw towards [viewer], no pitch, no roll, positive scale (design `spatialLayout.surfaces.tags`, profile D10). */
     fun face(viewer: Vec3) {
         if (!ready) return
         if (!part.shown) part.show(true)
-        val to = viewer - center
-        val flat = Vec3(to.x, 0f, to.z)
-        val n = if (flat.length < 1e-3f) Vec3(0f, 0f, 1f) else flat.normalized()
-        val right = Vec3.UP.cross(n).normalized()
-        part.place(center, Vec3(heightM * aspect, heightM, 1f), Quat4.fromBasis(right, Vec3.UP, n))
+        val h = heightM * lines
+        part.place(center, Vec3(h * aspect, h, 1f), Billboard.yawTowards(center, viewer))
     }
 
     fun hide() = part.show(false)

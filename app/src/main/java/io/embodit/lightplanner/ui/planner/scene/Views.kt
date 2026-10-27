@@ -53,7 +53,7 @@ internal object Dims {
  */
 internal class LampView(root: Entity, meshes: LpMeshes, private val m: LpMaterials, queue: WorkQueue, val id: String) {
     private val ring = Part(root, meshes.ring, m.plaster, "lamp:$id")
-    private val glow = Part(root, meshes.disc, m.glow3000, "lampGlow:$id")
+    private val glow = Part(root, meshes.disc, m.glow(Cct.DEFAULT), "lampGlow:$id")
     val number = TextPlate(root, meshes, m, queue, "lampNo:$id")
     private val hit = Entity()
     private var hitSet = false
@@ -105,7 +105,7 @@ internal class LampView(root: Entity, meshes: LpMeshes, private val m: LpMateria
  */
 internal class SelectView(root: Entity, meshes: LpMeshes, private val m: LpMaterials) {
     private val breath = Part(root, meshes.thinRing, m.amberBreath, "selectRing")
-    private val cone = Part(root, meshes.cone, m.cone3000, "cone")
+    private val cone = Part(root, meshes.cone, m.cone(Cct.DEFAULT), "cone")
     private val handleRing = Part(root, meshes.thinRing, m.amber, "handle")
     private val arrows = List(4) { Strip(root, meshes.band, m.amber, "handleArrow:$it") }
     private val hit = Entity()
@@ -364,7 +364,9 @@ internal class LinePool(private val root: Entity, private val meshes: LpMeshes, 
 
 /** Bitmaps for the label plates: text on an ink capsule, with an optional 4-cell brightness bar. */
 internal object Plates {
-    private const val H = 64
+    /** Pixels per line of a plate; [TextPlate] sizes a plate by its number of lines. */
+    const val LINE_PX = 64
+    private const val H = LINE_PX
     private const val PAD = 22
 
     private fun paint(size: Float, color: Int, bold: Boolean): Paint =
@@ -387,17 +389,24 @@ internal object Plates {
         return bmp
     }
 
-    /** A surface tag: "桌子 · 合适" plus a 4-cell bar (design `spatialLayout.surfaces.tags`). */
-    fun tag(text: String, grade: Grade, gradeColor: Color): Bitmap {
+    /**
+     * A surface tag: "茶几 · 偏暗" plus a 4-cell bar (design `spatialLayout.surfaces.tags`). The Chinese name
+     * leads (0.1.1, user feedback); [sub] is a smaller second line with the same in the UI language, or null.
+     */
+    fun tag(text: String, sub: String?, grade: Grade, gradeColor: Color): Bitmap {
         val p = paint(38f, LpColors.White.toArgb(), bold = true)
+        val ps = paint(28f, LpColors.OnInkSecondary.toArgb(), bold = false)
         val tw = p.measureText(text)
+        val sw = sub?.let { ps.measureText(it) } ?: 0f
         val barW = 4 * 26 + 3 * 6
-        val w = (PAD + tw + 18 + barW + PAD).toInt()
-        val bmp = Bitmap.createBitmap(w, H, Bitmap.Config.ARGB_8888)
+        val w = max(PAD + tw + 18 + barW + PAD, PAD + sw + PAD).toInt()
+        val h = if (sub == null) H else 2 * H
+        val bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
         val c = Canvas(bmp)
         val bg = Paint(Paint.ANTI_ALIAS_FLAG).apply { this.color = LpColors.PlateInk.toArgb() }
-        c.drawRoundRect(RectF(0f, 0f, w.toFloat(), H.toFloat()), 24f, 24f, bg)
+        c.drawRoundRect(RectF(0f, 0f, w.toFloat(), h.toFloat()), 24f, 24f, bg)
         c.drawText(text, PAD.toFloat(), H / 2f + 13f, p)
+        if (sub != null) c.drawText(sub, PAD.toFloat(), H + H / 2f + 4f, ps)
         val filled =
             when (grade) {
                 Grade.DARK -> 1

@@ -10,6 +10,7 @@ import io.embodit.lightplanner.data.AnchorOutcome
 import io.embodit.lightplanner.data.AnchorRecord
 import io.embodit.lightplanner.data.PlanStore
 import io.embodit.lightplanner.domain.Grade
+import io.embodit.lightplanner.domain.HeadPose
 import io.embodit.lightplanner.domain.Lamp
 import io.embodit.lightplanner.domain.LampParams
 import io.embodit.lightplanner.domain.LightField
@@ -22,6 +23,7 @@ import io.embodit.lightplanner.domain.RoomModel
 import io.embodit.lightplanner.domain.SavedLamp
 import io.embodit.lightplanner.domain.Settings
 import io.embodit.lightplanner.domain.Vec3
+import io.embodit.lightplanner.domain.VirtualRoom
 import io.embodit.lightplanner.platform.LpGraph
 import io.embodit.lightplanner.platform.LpLog
 import java.util.Locale
@@ -61,6 +63,18 @@ class PlannerViewModel(
 
     /** Debug: stay in S02 whatever the planes say. */
     @Volatile var debugHoldFinding = false
+
+    /** The current head pose (the scene's), for placing the virtual room in front of the user (profile D9). */
+    @Volatile var head: () -> HeadPose? = { null }
+
+    /** The planes as scanned; the room in the state may add the virtual room's (taste profile D7). */
+    private var realPlanes: List<PlaneSurface> = emptyList()
+
+    /** The last virtual room's size, kept when it is rebuilt in front of the user. */
+    private var lastVirtual: VirtualRoom? = null
+
+    /** The virtual room came from the 5 s timeout and the user has not touched it: a late real scan replaces it by itself (D7). */
+    private var virtualAuto = false
 
     private var saved: Plan? = null
     private var nextNo = 1
@@ -131,11 +145,16 @@ class PlannerViewModel(
             is PlannerEvent.ManualHeightPicked -> update { it.copy(manualPick = e.height) }
             PlannerEvent.UseManualHeight -> useManualHeight()
             PlannerEvent.UseDetectedCeiling -> {
-                update { it.copy(room = it.room.copy(manualCeiling = null), bar = if (it.bar?.kind == BarKind.CEILING_FOUND) null else it.bar) }
+                if (s.virtualRoom != null) LpLog.i("ROOM scanned (virtual room dropped)")
+                virtualAuto = false
+                update { it.copy(virtualRoom = null, room = roomOf(realPlanes, null, null), bar = if (it.bar?.kind == BarKind.CEILING_FOUND) null else it.bar) }
                 relevel()
                 recompute()
                 scheduleSave()
             }
+            PlannerEvent.VirtualRoomUse -> if (s.virtualRoom == null && s.phase != Phase.LOADING) enterVirtual("settings")
+            is PlannerEvent.VirtualRoomResize -> s.virtualRoom?.let { v -> setVirtual(v.resized(v.width + e.dWidth, v.depth + e.dDepth, v.height + e.dHeight), "resize") }
+            PlannerEvent.VirtualRoomRecenter -> s.virtualRoom?.let { v -> head()?.let { h -> setVirtual(VirtualRoom.around(h, RoomModel(realPlanes).floorY, v), "recenter") } }
             PlannerEvent.MismatchRetry -> if (s.phase == Phase.MISMATCH && !s.retrying) startRestore(RESTORE_RETRY_MS)
             PlannerEvent.MismatchRestart -> if (s.phase == Phase.MISMATCH) update { it.copy(restartConfirm = true) }
             PlannerEvent.RestartConfirmed -> if (s.phase == Phase.MISMATCH) clearAll(backToFinding = true)
@@ -180,11 +199,50 @@ class PlannerViewModel(
         findJob =
             scope.launch {
                 delay(FIND_TIMEOUT_MS)
-                if (_state.value.phase == Phase.FINDING) {
+                if (_state.value.phase == Phase.FINDING && !debugHoldFinding) {
+                    // never stuck on "finding the ceiling" (taste profile D7): the virtual room takes over
                     LpLog.i("CEILING not found after ${FIND_TIMEOUT_MS / 1000} s")
-                    update { it.copy(phase = Phase.NO_CEILING) }
+                    enterVirtual("timeout")
                 }
             }
+    }
+
+    /** The scanned planes plus the virtual room's: no scanned ceiling while the virtual one is in use. */
+    private fun roomOf(real: List<PlaneSurface>, v: VirtualRoom?, manual: Float?): RoomModel {
+        if (v == null) return RoomModel(real, manual)
+        val scanned = RoomModel(real)
+        val keep = real.filter { !scanned.isCeiling(it) }
+        return RoomModel(keep + v.planes(floor = !scanned.hasFloor, walls = scanned.walls.size < 2, table = !scanned.hasFurniture), null)
+    }
+
+    /** Uses the virtual room, built around the current head position and yaw (taste profile D7 / D9). */
+    private fun enterVirtual(reason: String) {
+        findJob?.cancel()
+        val h = head()
+        if (h == null) {
+            // no head pose yet: try again shortly (the scene reports one within a frame or two)
+            findJob = scope.launch {
+                delay(VIRTUAL_RETRY_MS)
+                enterVirtual(reason)
+            }
+            return
+        }
+        setVirtual(VirtualRoom.around(h, RoomModel(realPlanes).floorY, lastVirtual), reason)
+        timedBar(InlineBar(BarKind.VIRTUAL_ROOM, ++barSeq))
+        if (_state.value.phase != Phase.PLAN) enterPlan()
+    }
+
+    private fun setVirtual(v: VirtualRoom, reason: String) {
+        lastVirtual = v
+        virtualAuto = reason == "timeout"
+        ceilingOffered = false
+        update { it.copy(virtualRoom = v, room = roomOf(realPlanes, v, null)) }
+        LpLog.i(String.format(Locale.US, "ROOM virtual reason=%s w=%.1f d=%.1f h=%.2f floor=%.2f center=(%.2f, %.2f)", reason, v.width, v.depth, v.height, v.floorY, v.center.x, v.center.z))
+        if (_state.value.inPlan) {
+            relevel()
+            recompute()
+            refreshFurnitureBar()
+        }
     }
 
     private fun enterPlan() {
@@ -211,9 +269,29 @@ class PlannerViewModel(
 
     private fun onPlanes(incoming: RoomModel) {
         val s = _state.value
-        val room = RoomModel(incoming.planes, s.room.manualCeiling)
+        realPlanes = incoming.planes
+        val room = roomOf(realPlanes, s.virtualRoom, s.room.manualCeiling)
         val hadCeiling = s.room.ceilings.isNotEmpty()
         update { it.copy(room = room) }
+        // a real ceiling shows up while the virtual room is in use (D7): the scan takes over by itself when the virtual
+        // room came from the timeout and is untouched; a virtual room the user chose or sized gets an offer instead
+        if (s.virtualRoom != null && s.inPlan) {
+            val scanned = RoomModel(realPlanes)
+            val h = if (scanned.ceilings.isNotEmpty()) scanned.ceilingHeight() else null
+            if (h != null && virtualAuto) {
+                LpLog.i("ROOM scanned h=${fmt(h)} (replaces the timeout virtual room)")
+                virtualAuto = false
+                update { it.copy(virtualRoom = null, room = roomOf(realPlanes, null, null), bar = if (it.bar?.kind == BarKind.VIRTUAL_ROOM) null else it.bar) }
+                relevel()
+                recompute()
+                refreshFurnitureBar()
+                return
+            }
+            if (h != null && !ceilingOffered) {
+                ceilingOffered = true
+                update { it.copy(bar = InlineBar(BarKind.CEILING_FOUND, ++barSeq, value = h)) }
+            }
+        }
         if (s.phase == Phase.FINDING && room.ceilings.isNotEmpty() && !debugHoldFinding) {
             LpLog.i("CEILING found h=${room.ceilingHeight()?.let { fmt(it) }} planes=${room.planes.size}")
             enterPlan()
@@ -780,7 +858,9 @@ class PlannerViewModel(
     }
 
     companion object {
-        const val FIND_TIMEOUT_MS = 20_000L
+        /** Taste profile D7: about 5 s of scanning, then the virtual room (0.1.0 waited 20 s, then asked for a height). */
+        const val FIND_TIMEOUT_MS = 5_000L
+        const val VIRTUAL_RETRY_MS = 300L
         const val SAVE_DELAY_MS = 500L
         const val RESTORE_FIRST_MS = 4_000L
         const val RESTORE_RETRY_MS = 10_000L

@@ -74,19 +74,29 @@ writes is `panelShown`.
 - Thumbstick (taste profile D, adapted): a downlight has no facing, so stick X nudges the selected lamp sideways
   (head-right) along the ceiling at up to 0.4 m/s (dead zone 0.15) with the same row snap and guide line; the lamp
   panel's last line says 「摇杆左右微调位置」. Release commits (`STICK nudge end`). Recorded as a deviation.
-- Panels: the main panel (400 x 340 dp, 0.65 m, 22 degrees left / 20 down) follows lazily (30 degrees sideways, or
-  well above / below, for 0.6 s -> 0.4 s ease); looking up it rests 25 degrees under the gaze, looking down more
-  than 35 degrees it parks 35 degrees to the side at gaze + 15. Settings and the hole plan are pre-built slots to
-  the right of it, mutually exclusive; while one is open a pinch in the room only closes it and the next 0.4 s of
+- Panels (0.1.1, taste profile D9 / D10, user: "要抬着头看"): the main panel (400 x 400 dp, drawn 1.1x) rests 0.85 m
+  from the current head position along its yaw, 15 degrees under the horizon whatever the gaze pitch (never above
+  the eyes; 0.1.0 followed the gaze up to the ceiling), centre 20 degrees left of straight ahead so the reticle and
+  the furniture tag straight ahead stay free (1.25x at 15 degrees covered the bed tag on the emulator). Checked by
+  `PanelFollowTest` (turn 90 / 180, look up, side park). It follows lazily (30 degrees sideways, too near / far, for 0.6 s -> 0.4 s ease), so turning round re-centres
+  it in front; looking down more than 35 degrees it parks 38 degrees to the side at the same height (no follow loop
+  once it is where it would slide to). Settings (400 x 420) and the hole plan are pre-built slots to the right of it,
+  top-aligned with it (they grow downwards), mutually exclusive; while one is open a pinch in the room only closes it and the next 0.4 s of
   pinches are dropped (`TAP ignored reason=after-close`).
 - Persistence: one world anchor per lamp (`ANCHOR created lamp=`); plan.json saved 0.5 s after a change with each
   lamp's position, anchor id and the anchor's position then. Restore on launch: anchors loaded for up to 4 s; a lamp
   whose anchor is found moves with it, the rest follow the shift of a found lamp (S11 partial bar); none found ->
   S12 with "look again" (10 s) and "start over" (confirm). A lamp moved more than 5 cm from its anchor gets a new
   one; a deleted lamp keeps its anchor 5 s for undo.
-- Ceiling: S02 waits 20 s for a CEILING plane (or any horizontal plane 2 - 4 m above the floor), then S13 with the
-  manual heights 2.4 / 2.6 / 2.8 / 3.0 / 3.3 m (needs a floor plane). A real ceiling that later differs by > 3 cm
-  only offers "识别到天花板 2.74 m · 改用". Every lamp's y follows the ceiling above it when planes change.
+- Ceiling: S02 waits 5 s for a CEILING plane (or any horizontal plane 2 - 4 m above the floor), then the virtual room
+  takes over (0.1.1, taste profile D7, `domain/VirtualRoom.kt`, log `ROOM virtual reason=timeout`): a 4 x 5 x 2.7 m box
+  built around the current head position and yaw (user 1 m behind its centre; floor = scanned floor, else 1.6 m under
+  the eyes) with floor / ceiling / 4 walls / one coffee table as ordinary planes, merged with the scanned planes
+  (scanned ceilings are left out while it is in use; its floor / walls / table only when the scan has none). Settings
+  shows width / depth / height steppers and "移到我面前"; without it, "改用虚拟房间". A real ceiling that arrives later
+  replaces an untouched timeout room by itself (`ROOM scanned ... replaces`), otherwise it offers "识别到天花板 · 改用".
+  S13 (manual heights 2.4 - 3.3 m) is still in the code, reached by `state S13`. Every lamp's y follows the ceiling
+  above it when planes change. The virtual room is not saved: after a relaunch without a scan it is rebuilt in front.
 
 ## UI rules
 
@@ -94,9 +104,13 @@ writes is `panelShown`.
 - Every panel is a pre-built Stage attachment panel (AlertDialog / SnackbarHost / native popups do not work in a Stage).
 - The heat switch is a `Button` drawn as a toggle (the SpatialUI toggle button's Kotlin name was not confirmed).
 - 3D labels (lamp numbers, furniture tags with the 4-cell bar, spacing / wall labels) are bitmap plates
-  (`TextPlate`, MASKED unlit material), not panels; the light pools are per-surface bitmaps on a shared unit square
+  (`TextPlate`, MASKED unlit material), not panels, turned about the vertical towards the eye every frame
+  (`domain/Billboard.kt`). The engine samples a bitmap with v = 0 at its BOTTOM row: 0.1.0 gave the plate's top
+  v = 0 and every label was upside down on the headset; `Billboard.UV` and `BillboardTest` pin the fix (yaw only,
+  front to the eye, +X to the viewer's right, bitmap top row on top). Furniture tags lead with the Chinese name
+  ("茶几 · 偏暗"), with the UI-language line under it when that is not Chinese; the light pools are per-surface bitmaps on a shared unit square
   (`LightLayerView`, TRANSPARENT unlit material). Whether the engine blends per texel is the design's spike item;
-  `pools disc` falls back to flat 35 % discs, `flipv on` mirrors the texture's v axis if pools land mirrored.
+  `pools disc` falls back to flat 35 % discs. The layer quad's UVs follow the same bottom-up v as the plates (`LayerQuad`, `LayerMappingTest`; 0.1.1 — 0.1.0 had them mirrored along Z); `flipv on` swaps back to the 0.1.0 mapping for comparison.
 - Copy in `res/values` / `res/values-zh`; read through `rs()` (`LocalLpResources`) so the language switches live;
   the 3D plates get their copy through `SceneStrings`. After changing zh copy run `python tools/subset_cjk_font.py`.
 - Launcher icon: `res/drawable/ic_launcher_foreground.xml` on plum `#4A2D5E`; `tools/make_icon.py` writes the 3D
@@ -123,7 +137,8 @@ PLANES CEILING ANCHOR SAVE RESTORE LIGHT FRAME FOLLOW PANEL RIG CMD DUMP POOL FI
 |---|---|---|
 | `state` | s=S00..S17 | jump to that design state (S04-S12, S14, S15 seed the demo lamps first; the base clears the plan); without `s` prints the `STATE` line |
 | `seedLamps` | s=demo \| n | demo: two 60-degree lamps 2.6 m apart (red at H 2.7), one over the first tagged surface (high output), one 0.2 m from the nearest wall (2700 K), one 24-degree accent; n: a grid of n |
-| `lamp` | s="<no> select \| delete \| beam 24/36/60/90 \| output s/m/l \| cct 2700/3000/4000" | select / edit / delete lamp number no |
+| `lamp` | s="<no> select \| delete \| beam 24/36/60/90 \| output s/m/l \| cct 2700/3000/4000/5000/6500/red/amber/green/blue/violet" | select / edit / delete lamp number no |
+| `virtual` | s=on \| off \| recenter \| size (a=dw,dd,dh metres) | use the virtual room now / back to the scan / rebuild it in front / resize |
 | `drag` | s="<no> dx dz [hold]" | move lamp no by (dx, dz) metres on the ceiling (snap applies); `hold` keeps it in S06 until `release` |
 | `release` | | end a held drag |
 | `place` | a=x,z or --ef x --ef z | place a lamp at (x, z) (Stage metres) |
@@ -141,9 +156,11 @@ PLANES CEILING ANCHOR SAVE RESTORE LIGHT FRAME FOLLOW PANEL RIG CMD DUMP POOL FI
 | `dump` · `pose` · `panels` · `planes` · `layers` · `bounds` | | reading back; `dump` writes files/dump.txt (STATE, POOL per lamp x surface with r, FIELD per surface with lit / dark cells, HOLE wall distances, PLANE kinds) |
 
 Control names: `settings heat hole done delete bar_action` (plan / lamp view) · `beam_24 beam_36 beam_60 beam_90
-output_s output_m output_l cct_2700 cct_3000 cct_4000` (lamp view) · `start retry manual_height height_2.4 .. height_3.3
+output_s output_m output_l cct_2700 cct_3000 cct_4000 cct_5000 cct_6500 cct_red cct_amber cct_green cct_blue
+cct_violet` (lamp view) · `start retry manual_height height_2.4 .. height_3.3
 use_this look_again restart restart_cancel restart_confirm grant` (setup states) · `close lang_system lang_zh lang_en
-show_spacing clear clear_cancel clear_confirm` (settings) · `back` (hole plan). Panel ids: `main settings holePlan`.
+show_spacing clear clear_cancel clear_confirm virtual_use virtual_recenter virtual_width_minus/_plus
+virtual_depth_minus/_plus virtual_height_minus/_plus` (settings) · `back` (hole plan). Panel ids: `main settings holePlan`.
 
 ## QA screenshot list (one per design state; `state Sxx`, wait ~8 s for the panels; seeded states need the room's planes)
 

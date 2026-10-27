@@ -76,13 +76,6 @@ data class LightResult(
  * the SDK.
  */
 object LightField {
-    private val POOL_RGB =
-        mapOf(
-            Cct.K2700 to floatArrayOf(1.00f, 0.76f, 0.48f),
-            Cct.K3000 to floatArrayOf(1.00f, 0.84f, 0.60f),
-            Cct.K4000 to floatArrayOf(1.00f, 0.95f, 0.84f),
-        )
-
     fun compute(lamps: List<Lamp>, room: RoomModel, previous: Map<String, Grade>, ceilingY: (Lamp) -> Float, maxCells: Int = LightMath.MAX_CELLS): LightResult {
         val t0 = System.nanoTime()
         val fields = ArrayList<SurfaceField>()
@@ -103,7 +96,7 @@ object LightField {
                 val eCenter = i0 / (dh * dh)
                 val radius = LightMath.poolRadius(lamp.beam, dh)
                 val cut = 2f * radius
-                val rgb = POOL_RGB[lamp.cct]!!
+                val rgb = lamp.cct.rgb
                 val blockers = higher.filter { it.y < lampY }
                 val lx = lamp.pos.x
                 val lz = lamp.pos.z

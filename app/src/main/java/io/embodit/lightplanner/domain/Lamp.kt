@@ -44,16 +44,34 @@ enum class Output(val lumens: Float, val watts: Int, val tag: String) {
     }
 }
 
-/** Colour temperature (design `lightModel.lamp.cct`): only the colour of the pool. */
-enum class Cct(val kelvin: Int, val tag: String) {
-    K2700(2700, "2700"),
-    K3000(3000, "3000"),
-    K4000(4000, "4000");
+/**
+ * The light's colour (design `lightModel.lamp.cct`; 0.1.1 user feedback: "光的颜色也可以选最好"): five white
+ * colour temperatures, plus five colours for RGB downlights. It only tints the pool, the cone and the lamp's
+ * glow; brightness and grades stay those of the lamp's output. [rgb] is the pool's tint (0..1, brightest
+ * channel 1); [kelvin] is 0 for a colour.
+ */
+enum class Cct(val kelvin: Int, val tag: String, val rgb: FloatArray) {
+    K2700(2700, "2700", floatArrayOf(1.00f, 0.76f, 0.48f)),
+    K3000(3000, "3000", floatArrayOf(1.00f, 0.84f, 0.60f)),
+    K4000(4000, "4000", floatArrayOf(1.00f, 0.95f, 0.84f)),
+    K5000(5000, "5000", floatArrayOf(0.96f, 0.98f, 1.00f)),
+    K6500(6500, "6500", floatArrayOf(0.80f, 0.89f, 1.00f)),
+    RED(0, "red", floatArrayOf(1.00f, 0.32f, 0.28f)),
+    AMBER(0, "amber", floatArrayOf(1.00f, 0.62f, 0.18f)),
+    GREEN(0, "green", floatArrayOf(0.38f, 1.00f, 0.52f)),
+    BLUE(0, "blue", floatArrayOf(0.36f, 0.56f, 1.00f)),
+    VIOLET(0, "violet", floatArrayOf(0.74f, 0.44f, 1.00f));
+
+    /** A white colour temperature (the hole plan prints "3000 K"); false for a colour. */
+    val white: Boolean
+        get() = kelvin > 0
 
     companion object {
         val DEFAULT = K3000
+        val WHITES: List<Cct> = entries.filter { it.white }
+        val COLOURS: List<Cct> = entries.filter { !it.white }
 
-        fun byTag(tag: String?): Cct? = entries.firstOrNull { it.tag == tag || it.name.equals(tag, ignoreCase = true) || it.kelvin.toString() == tag }
+        fun byTag(tag: String?): Cct? = entries.firstOrNull { it.tag == tag || it.name.equals(tag, ignoreCase = true) || (it.white && it.kelvin.toString() == tag) }
     }
 }
 
