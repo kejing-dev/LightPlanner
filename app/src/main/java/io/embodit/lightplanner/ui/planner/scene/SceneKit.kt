@@ -169,6 +169,12 @@ internal class LpMaterials(private val shared: SharedResources) {
 
     fun poolDisc(cct: Cct): Material = poolDiscs.getOrPut(cct) { sheer(LpColors.pool(cct), 0.35f) }
 
+    // the placing ghost (taste profile D1): a see-through downlight and a faint pool where the ray points
+    private val ghosts = HashMap<Cct, Material>()
+    val ghostPlaster: Material = sheer(LpColors.LampPlaster, 0.5f)
+
+    fun ghost(cct: Cct): Material = ghosts.getOrPut(cct) { sheer(LpColors.pool(cct), 0.6f) }
+
     fun line(kind: LineKind): Material = when (kind) { LineKind.OK -> lineOk; LineKind.DARK_GAP -> lineDark; LineKind.ACCENT -> lineAccent }
 
     private fun unlit(color: Color, twoSided: Boolean = false): Material =

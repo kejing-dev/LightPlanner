@@ -3,11 +3,14 @@ package io.embodit.lightplanner.platform.tracking
 import android.os.SystemClock
 import com.pico.spatial.tracking.DataProvider
 import com.pico.spatial.tracking.controller.ControllerTrackingProvider
+import io.embodit.lightplanner.domain.Quat4
+import io.embodit.lightplanner.domain.Vec3
 import io.embodit.lightplanner.platform.LpLog
 import kotlin.math.abs
 
 /**
- * The controllers' thumbstick X axis (v0.1.1, device feedback: the stick turns the selected piece),
+ * The controllers: the pointing ray (0.1.1, taste profile D1: the placing preview follows the controller ray, not
+ * the head) and the thumbstick X axis (v0.1.1, device feedback: the stick turns the selected piece),
  * from `ControllerTrackingProvider`'s action listener (SDK doc "Obtain controller input actions"; Full
  * Space only). The listener runs on the data source thread at the device rate: it only stores the
  * value; the ECS system reads it once per frame. Hand gestures are untouched (another input path).
@@ -24,12 +27,23 @@ class ControllerStick {
     @Volatile private var debugX = 0f
     @Volatile private var debugUntilMs = 0L
 
-    // the stick pushed further of the two controllers
+    /** The controller whose trigger was touched last aims (the right one at first, Spatial Ruler `PointerSource`). */
+    @Volatile private var useRight = true
+
+    /** Debug: a ray that wins over the controllers until [debugRayUntilMs] (emulator QA has no controller pose). */
+    @Volatile private var debugRay: Pair<Vec3, Vec3>? = null
+    @Volatile private var debugRayUntilMs = 0L
+
+    // the stick pushed further of the two controllers; the listener only stores values (data source thread)
     private val listener =
         ControllerTrackingProvider.ControllerActionListener { a ->
             val l = a.left.thumbstickValue.x
             val r = a.right.thumbstickValue.x
             x = if (abs(r) >= abs(l)) r else l
+            val lt = a.left.triggerValue
+            val rt = a.right.triggerValue
+            if (useRight && lt > SWITCH_AT && rt < REST_BELOW) useRight = false
+            if (!useRight && rt > SWITCH_AT && lt < REST_BELOW) useRight = true
             atMs = SystemClock.elapsedRealtime()
             actions++
         }
@@ -62,6 +76,28 @@ class ControllerStick {
         return x.coerceIn(-1f, 1f)
     }
 
+    /**
+     * The aiming controller's ray in Stage metres (origin, unit direction along the pose's -Z), read on the main
+     * thread once per frame; null without a tracked controller. Same tracking space as the HMD pose the scene uses.
+     */
+    fun ray(nowMs: Long): Pair<Vec3, Vec3>? {
+        if (nowMs < debugRayUntilMs) return debugRay
+        val p = provider ?: return null
+        if (runCatching { p.supportState }.getOrNull() != DataProvider.SupportState.SUPPORTED) return null
+        val data = runCatching { p.latestData }.getOrNull() ?: return null
+        val pose = (if (useRight) data.right ?: data.left else data.left ?: data.right) ?: return null
+        val origin = Vec3(pose.position.x, pose.position.y, pose.position.z)
+        val dir = Quat4(pose.rotation.x, pose.rotation.y, pose.rotation.z, pose.rotation.w).rotate(Vec3.AHEAD)
+        if (!origin.isFinite() || !dir.isFinite() || dir.length < 0.5f || origin.length < 1e-3f) return null
+        return origin to dir.normalized()
+    }
+
+    /** Debug `ray`: aims from [origin] along [dir] for [ms]. */
+    fun debugAim(origin: Vec3, dir: Vec3, ms: Long) {
+        debugRay = origin to dir.normalized()
+        debugRayUntilMs = SystemClock.elapsedRealtime() + ms
+    }
+
     /** Debug `stick`: holds [value] for [ms]. */
     fun debugHold(value: Float, ms: Long) {
         debugX = value.coerceIn(-1f, 1f)
@@ -72,5 +108,7 @@ class ControllerStick {
 
     private companion object {
         const val STALE_MS = 500L
+        const val SWITCH_AT = 0.15f
+        const val REST_BELOW = 0.05f
     }
 }

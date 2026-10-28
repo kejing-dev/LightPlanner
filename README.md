@@ -6,10 +6,12 @@
 
 **Look at the spot you want lit and pinch: a downlight lands on the real ceiling right above it, its light pool falls on your real desk and sofa, and you can see at a glance whether the spacing is right.**
 
-PICO OS 6 · PICO Spatial SDK 6.1.9 · Kotlin / SpatialUI · package `io.embodit.lightplanner` · v0.1.1
+PICO OS 6 · PICO Spatial SDK 6.1.9 · Kotlin / SpatialUI · package `io.embodit.lightplanner` · v0.1.2
 
-> **v0.1.1 按头显试用反馈打磨：3D 文字不再倒置、面板不用抬头、光色可选（2700–6500 K + 5 种彩光）、扫不到天花板 5 秒后用虚拟房间。模拟器验证通过；最终包还要在头显上再看一眼。**
-> **v0.1.1 polish from headset feedback: 3D text no longer upside down, panels below eye level, selectable light colour (2700–6500 K plus 5 colours), virtual room after 5 s without a ceiling. Verified on the emulator; the final build still needs a look on the headset.**
+> **v0.1.2 按头显试用反馈：手柄射线放灯（天花板上先出幽灵筒灯和光斑预览，扣扳机装上，按住可拖）、主面板静音键、灯列表。用户已在头显上看过 v0.1.2。**
+> **v0.1.2 from headset feedback: place lamps with the controller ray (a ghost downlight and pool preview, trigger to place, hold to drag), a mute key on the main panel, and a lamp list. Checked by the user on the headset.**
+
+![射线幽灵灯：手柄射线指向床尾，天花板上出现半透明幽灵筒灯，主面板列出 3 盏灯并有静音键](docs/ray-ghost.jpg)
 
 ![封面：选中 3 号灯，60° 光锥从天花板照到床上；面板显示光束角、亮度、色温 5 档和 5 种彩光，标题旁色卡「暖白 3000 K」；床上方标签「床 2 · 偏亮」](docs/cover-S05-selected.jpg)
 
@@ -31,7 +33,7 @@ PICO OS 6 · PICO Spatial SDK 6.1.9 · Kotlin / SpatialUI · package `io.embodit
 ### 安装与启动
 
 ```bash
-adb install -r LightPlanner-v0.1.1.apk
+adb install -r LightPlanner-v0.1.2.apk
 pico-cli app launch io.embodit.lightplanner
 ```
 
@@ -63,6 +65,12 @@ APK 在 [Releases](https://github.com/kejing-dev/LightPlanner/releases) 页面�
 启动器图标：
 
 <img src="docs/launcher.jpg" width="480" alt="系统「回到主页」框里的应用图标">
+
+### v0.1.2 改了什么
+
+- **手柄射线放灯**：预览跟着手柄射线走——射线指到哪儿，天花板上就出现一盏半透明的「幽灵」筒灯，下面带一圈下一盏灯的光斑；扣扳机就装在幽灵的位置。放好后指着灯按住扳机能拖，灯跟着射线走。没手柄时用视线。
+- **主面板静音键**：标题行右侧喇叭键，一眼可见，状态记住；连续乱点时同一种提示音限频，不会连响。
+- **灯列表**：主面板列出所有灯（编号、光束、光色），点一行选中，箭头键把这盏灯移到你正前方 1.5 m 的天花板上，垃圾桶删除（可撤销）。
 
 ### v0.1.1 改了什么
 
@@ -98,7 +106,7 @@ Direct light only, relative brightness — this is not a light meter.
 ### Install and launch
 
 ```bash
-adb install -r LightPlanner-v0.1.1.apk
+adb install -r LightPlanner-v0.1.2.apk
 pico-cli app launch io.embodit.lightplanner
 ```
 
@@ -115,6 +123,12 @@ Download the APK from the [Releases](https://github.com/kejing-dev/LightPlanner/
 ### Screenshots
 
 See the table above: intro, five-lamp layout, 24° spot, lamp panel, light colours, virtual room, furniture tags, brightness map, hole plan.
+
+### What changed in v0.1.2
+
+- **Placing with the controller ray**: the preview follows the controller ray. A see-through "ghost" downlight appears on the ceiling above where the ray points, with a faint pool of the next lamp below; pull the trigger and the lamp goes exactly there. Point at a placed lamp and hold the trigger to drag it along the ray. Without a controller the gaze is used.
+- **Mute key on the main panel**: a speaker key in the title row, remembered; repeated pinches no longer fire the same sound back to back.
+- **Lamp list**: the main panel lists every lamp (number, beam, colour); tap a row to select it, the arrow key brings that lamp onto the ceiling 1.5 m in front of you, the bin deletes it (with undo).
 
 ### What changed in v0.1.1
 

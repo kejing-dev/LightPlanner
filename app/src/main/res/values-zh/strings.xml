@@ -135,4 +135,7 @@
     <string name="virtual_use">改用虚拟房间</string>
     <string name="virtual_recenter">移到我面前</string>
     <string name="status_lamps_virtual">%1$d 盏 · 虚拟房间 层高 %2$s</string>
+    <string name="action_mute">静音</string>
+    <string name="action_unmute">打开声音</string>
+    <string name="lamp_front">移到我面前</string>
 </resources>

@@ -17,7 +17,23 @@ data class AnchorPose(val position: Vec3, val rotation: Quat4) {
 enum class LanguagePref(val tag: String) { SYSTEM("system"), ZH("zh"), EN("en") }
 
 /** Settings (design `dataModel.settings`). */
-data class Settings(val language: LanguagePref = LanguagePref.SYSTEM, val showSpacing: Boolean = true, val firstRunDone: Boolean = false)
+data class Settings(val language: LanguagePref = LanguagePref.SYSTEM, val showSpacing: Boolean = true, val firstRunDone: Boolean = false, val sound: Boolean = true)
+
+/**
+ * Feedback sounds stay quiet when pinching fast (taste profile D15, 0.1.1): each kind plays at most once per its
+ * gap; a refused pinch (reject) has the longest one, since repeated misses were the noisy case.
+ */
+class SoundGate(private val gapsMs: Map<String, Long> = mapOf("reject" to 800L, "select" to 300L, "place" to 150L, "snap" to 400L)) {
+    private val last = HashMap<String, Long>()
+
+    fun allow(kind: String, nowMs: Long): Boolean {
+        val gap = gapsMs[kind] ?: 200L
+        val prev = last[kind]
+        if (prev != null && nowMs - prev < gap) return false
+        last[kind] = nowMs
+        return true
+    }
+}
 
 /**
  * One saved lamp: its Stage position at save time, its anchor and where that anchor was then. On

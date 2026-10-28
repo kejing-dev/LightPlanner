@@ -22,6 +22,7 @@ import io.embodit.lightplanner.domain.PlaneSurface
 import io.embodit.lightplanner.domain.RoomModel
 import io.embodit.lightplanner.domain.SavedLamp
 import io.embodit.lightplanner.domain.Settings
+import io.embodit.lightplanner.domain.SoundGate
 import io.embodit.lightplanner.domain.Vec3
 import io.embodit.lightplanner.domain.VirtualRoom
 import io.embodit.lightplanner.platform.LpGraph
@@ -94,6 +95,7 @@ class PlannerViewModel(
     private var dragOrigin: Lamp? = null
     private var permissionDenied = false
     private var ceilingOffered = false
+    private val soundGate = SoundGate()
     private val anchorJobs = HashMap<String, Job>()
 
     init {
@@ -129,6 +131,12 @@ class PlannerViewModel(
             is PlannerEvent.OutputSelected -> editSelected { it.copy(output = e.output) }
             is PlannerEvent.CctSelected -> editSelected { it.copy(cct = e.cct) }
             PlannerEvent.DeleteClicked -> deleteSelected()
+            is PlannerEvent.LampListSelected -> if (s.inPlan && s.lamp(e.id) != null) select(e.id, "list")
+            is PlannerEvent.LampListDelete -> if (s.inPlan && s.lamp(e.id) != null) {
+                select(e.id, "list")
+                deleteSelected()
+            }
+            is PlannerEvent.LampToFront -> if (s.inPlan) lampToFront(e.id)
             PlannerEvent.UndoClicked -> undoDelete()
             PlannerEvent.DoneClicked -> if (s.selected != null) update { it.copy(selected = null, dragging = null) }
             PlannerEvent.HeatToggled -> if (s.inPlan && s.popup != Popup.HOLE_PLAN) update { it.copy(heat = !it.heat) }
@@ -137,6 +145,10 @@ class PlannerViewModel(
             PlannerEvent.PopupClosed -> update { it.copy(popup = Popup.NONE, clearConfirm = false) }
             is PlannerEvent.LanguageSelected -> settings { it.copy(language = e.language) }
             is PlannerEvent.ShowSpacingToggled -> settings { it.copy(showSpacing = e.on) }
+            PlannerEvent.SoundToggled -> {
+                settings { it.copy(sound = !it.sound) }
+                LpLog.i("SOUND on=${_state.value.settings.sound}")
+            }
             PlannerEvent.ClearClicked -> if (s.popup == Popup.SETTINGS) update { it.copy(clearConfirm = true) }
             PlannerEvent.ClearConfirmed -> clearAll(backToFinding = false)
             PlannerEvent.ClearCancelled -> update { it.copy(clearConfirm = false) }
@@ -404,7 +416,7 @@ class PlannerViewModel(
         val lamp = Lamp(id = UUID.randomUUID().toString().take(8), no = nextNo++, pos = Vec3(xz.x, ceilY, xz.z), beam = s.lastParams.beam, output = s.lastParams.output, cct = s.lastParams.cct)
         update { it.copy(lamps = it.lamps + lamp, selected = lamp.id, undo = null, bar = if (it.bar?.kind == BarKind.DELETED) null else it.bar) }
         LpLog.i("PLACE id=${lamp.id} no=${lamp.no} at=${LpLog.pos(lamp.pos)} from=${if (isCeiling) "ceiling" else plane.semantic} hit=${LpLog.pos(point)} beam=${lamp.beam.tag} out=${lamp.output.tag} cct=${lamp.cct.tag}")
-        _effects.tryEmit(PlannerEffect.Feedback("place"))
+        feedback("place")
         createAnchor(lamp)
         recompute()
         scheduleSave()
@@ -414,12 +426,12 @@ class PlannerViewModel(
         val lamp = _state.value.lamp(id) ?: return
         update { it.copy(selected = id, lastParams = lamp.params) }
         LpLog.i("SELECT id=$id no=${lamp.no} via=$via")
-        _effects.tryEmit(PlannerEffect.Feedback("select"))
+        feedback("select")
     }
 
     private fun reject(reason: String) {
         LpLog.i("PLACE rejected reason=$reason")
-        _effects.tryEmit(PlannerEffect.Feedback("reject"))
+        feedback("reject")
     }
 
     // ---- drag / stick -------------------------------------------------------------------------
@@ -464,6 +476,19 @@ class PlannerViewModel(
             refreshAnchor(moved)
             scheduleSave()
         }
+    }
+
+    /**
+     * "Move in front of me" from the lamp list (0.1.1, factory audit: every placed object can be brought back):
+     * the lamp goes onto the ceiling [LAMP_FRONT_M] ahead of the current head position along its yaw (taste profile
+     * D9), kept off the walls; it is selected so the panel shows it.
+     */
+    private fun lampToFront(id: String) {
+        val h = head() ?: return
+        _state.value.lamp(id) ?: return
+        val xz = P2.of(h.position) + h.level() * LAMP_FRONT_M
+        moveLamp(id, xz, save = true, via = "front")
+        select(id, "front")
     }
 
     // ---- lamp parameters, delete, undo -------------------------------------------------------------
@@ -580,6 +605,16 @@ class PlannerViewModel(
     }
 
     // ---- settings, bars ---------------------------------------------------------------------------
+
+    /** A feedback sound, unless muted (taste profile D15) or the same kind just played ([SoundGate]). */
+    private fun feedback(kind: String) {
+        if (!_state.value.settings.sound) return
+        if (!soundGate.allow(kind, SystemClock.elapsedRealtime())) {
+            LpLog.i("SOUND skipped kind=$kind reason=rate")
+            return
+        }
+        _effects.tryEmit(PlannerEffect.Feedback(kind))
+    }
 
     private fun settings(f: (Settings) -> Settings) {
         val next = f(_state.value.settings)
@@ -861,6 +896,7 @@ class PlannerViewModel(
         /** Taste profile D7: about 5 s of scanning, then the virtual room (0.1.0 waited 20 s, then asked for a height). */
         const val FIND_TIMEOUT_MS = 5_000L
         const val VIRTUAL_RETRY_MS = 300L
+        const val LAMP_FRONT_M = 1.5f
         const val SAVE_DELAY_MS = 500L
         const val RESTORE_FIRST_MS = 4_000L
         const val RESTORE_RETRY_MS = 10_000L

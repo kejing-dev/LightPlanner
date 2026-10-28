@@ -54,6 +54,17 @@ writes is `panelShown`.
   `ceilingYAt(x, z)` above that spot; on a wall, or where no ceiling is above, the reticle shows a red cross
   and the pinch is refused (`PLACE rejected reason=`). Within 12 cm of an existing lamp's projection the pinch
   selects that lamp instead. 16 lamps at most (S14 bar). A new lamp inherits the last selected lamp's parameters.
+- Preview and confirm (0.1.2, taste profile D1): the preview follows the controller ray (`ControllerStick.ray`, the
+  controller whose trigger was touched last; the head gaze only without a controller): a ghost downlight (see-through
+  ring + glow in the next lamp's colour) on the ceiling above the hit and a faint pool of its beam on the surface.
+  The trigger arrives as the system tap; with a controller the tap's surface point is recomputed from the same ray
+  (`TAP ... via=ray`), so the lamp lands exactly at the ghost. Dragging with a controller follows the ray too
+  (`DRAG ray`): the ring on ray x ceiling, the handle on ray x its locked level; DragLine is only the fallback.
+- Lamp list (0.1.2): the plan view lists every lamp (number, beam, colour); a row selects it, the arrow key moves it
+  onto the ceiling 1.5 m ahead of the current head position along its yaw (`MOVE via=front`), the bin deletes it
+  (undo bar as usual).
+- Sound (0.1.2, taste profile D15): a mute key in the main panel's title row (setting `sound`, saved); place / select
+  / reject / snap each play at most once per 150 / 300 / 800 / 400 ms (`SoundGate`, `SOUND skipped reason=rate`).
 - Light (design `lightModel`): I(a) = I0 cos^n a, n = ln 0.5 / ln cos(theta/2), I0 = Phi (n+1) / 2 pi, E = I cos a / d^2,
   summed over lamps per 4 cm cell, cells beyond 2 r skipped, a cell is shadowed when the line to the lamp crosses a
   higher receiver's polygon. Pool alpha = 55 % (E / E_centre)^2 per lamp, capped at 72 %; the half-power rim
@@ -138,6 +149,8 @@ PLANES CEILING ANCHOR SAVE RESTORE LIGHT FRAME FOLLOW PANEL RIG CMD DUMP POOL FI
 | `state` | s=S00..S17 | jump to that design state (S04-S12, S14, S15 seed the demo lamps first; the base clears the plan); without `s` prints the `STATE` line |
 | `seedLamps` | s=demo \| n | demo: two 60-degree lamps 2.6 m apart (red at H 2.7), one over the first tagged surface (high output), one 0.2 m from the nearest wall (2700 K), one 24-degree accent; n: a grid of n |
 | `lamp` | s="<no> select \| delete \| beam 24/36/60/90 \| output s/m/l \| cct 2700/3000/4000/5000/6500/red/amber/green/blue/violet" | select / edit / delete lamp number no |
+| `ray` | a=x,y,z[,ms] | a stand-in controller ray from the head to that Stage point (default 60 s): the ghost preview and ray drags follow it |
+| `trigger` | | the tap a trigger press would deliver along that ray (places / selects like a pinch) |
 | `virtual` | s=on \| off \| recenter \| size (a=dw,dd,dh metres) | use the virtual room now / back to the scan / rebuild it in front / resize |
 | `drag` | s="<no> dx dz [hold]" | move lamp no by (dx, dz) metres on the ceiling (snap applies); `hold` keeps it in S06 until `release` |
 | `release` | | end a held drag |
@@ -155,7 +168,7 @@ PLANES CEILING ANCHOR SAVE RESTORE LIGHT FRAME FOLLOW PANEL RIG CMD DUMP POOL FI
 | `hidemode` | s=auto\|park | how hidden panels are stowed |
 | `dump` · `pose` · `panels` · `planes` · `layers` · `bounds` | | reading back; `dump` writes files/dump.txt (STATE, POOL per lamp x surface with r, FIELD per surface with lit / dark cells, HOLE wall distances, PLANE kinds) |
 
-Control names: `settings heat hole done delete bar_action` (plan / lamp view) · `beam_24 beam_36 beam_60 beam_90
+Control names: `settings sound heat hole done delete bar_action` (plan / lamp view) · `beam_24 beam_36 beam_60 beam_90
 output_s output_m output_l cct_2700 cct_3000 cct_4000 cct_5000 cct_6500 cct_red cct_amber cct_green cct_blue
 cct_violet` (lamp view) · `start retry manual_height height_2.4 .. height_3.3
 use_this look_again restart restart_cancel restart_confirm grant` (setup states) · `close lang_system lang_zh lang_en

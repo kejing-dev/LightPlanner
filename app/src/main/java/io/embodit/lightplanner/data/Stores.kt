@@ -63,6 +63,7 @@ class FilePlanStore(context: Context) : PlanStore {
             language = LanguagePref.entries.firstOrNull { it.tag == prefs.getString("lang", null) } ?: LanguagePref.SYSTEM,
             showSpacing = prefs.getBoolean("showSpacing", true),
             firstRunDone = prefs.getBoolean("firstRunDone", false),
+            sound = prefs.getBoolean("sound", true),
         )
 
     override fun saveSettings(settings: Settings) {
@@ -70,6 +71,7 @@ class FilePlanStore(context: Context) : PlanStore {
             .putString("lang", settings.language.tag)
             .putBoolean("showSpacing", settings.showSpacing)
             .putBoolean("firstRunDone", settings.firstRunDone)
+            .putBoolean("sound", settings.sound)
             .apply()
     }
 }

@@ -12,6 +12,7 @@ import com.pico.spatial.core.ecs.InteractableComponent
 import com.pico.spatial.core.ecs.resource.TextureResource
 import com.pico.spatial.core.ecs.resource.UnlitMaterial
 import io.embodit.lightplanner.domain.Cct
+import io.embodit.lightplanner.domain.LampParams
 import io.embodit.lightplanner.domain.Grade
 import io.embodit.lightplanner.domain.LightMath
 import io.embodit.lightplanner.domain.P2
@@ -163,30 +164,47 @@ internal class SelectView(root: Entity, meshes: LpMeshes, private val m: LpMater
 }
 
 /**
- * The gaze reticle (design `spatialLayout.reticle`): a dashed lamp ring on the ceiling; on a lower surface
- * a dot plus a dashed vertical line up to the ceiling ring; a red cross where a lamp cannot go.
+ * The placing preview (design `spatialLayout.reticle`; 0.1.1, taste profile D1): where the controller ray (or the
+ * gaze without a controller) meets the room. On a surface: a dot, a dashed pole up to the ceiling and a ghost
+ * downlight there with a faint pool of the next lamp's beam and colour; on the ceiling: the ghost downlight; on a wall
+ * or where no ceiling is above: a red cross. A trigger press (the system tap) places the lamp at the ghost.
  */
 internal class ReticleView(root: Entity, meshes: LpMeshes, private val m: LpMaterials) {
     private val ring = Part(root, meshes.dashedRing, m.reticleDash, "reticleRing")
     private val dot = Part(root, meshes.disc, m.reticle, "reticleDot")
     private val pole = Strip(root, meshes.dashes, m.reticleDash, "reticlePole")
     private val cross = List(2) { Strip(root, meshes.band, m.reticleBad, "reticleCross:$it") }
+    private val ghostRing = Part(root, meshes.ring, m.ghostPlaster, "ghostRing")
+    private val ghostGlow = Part(root, meshes.disc, m.ghost(Cct.DEFAULT), "ghostGlow")
+    private val ghostPool = Part(root, meshes.disc, m.poolDisc(Cct.DEFAULT), "ghostPool")
 
     init {
         hide()
     }
 
-    fun ceiling(at: Vec3) {
-        ring.place(Vec3(at.x, at.y - Dims.RING_BELOW - 0.0015f, at.z), Vec3(Dims.RETICLE_RING_D, 1f, Dims.RETICLE_RING_D))
+    private fun ghost(at: Vec3, ceilingY: Float, cct: Cct) {
+        val y = ceilingY - Dims.RING_BELOW
+        ghostRing.place(Vec3(at.x, y - 0.001f, at.z), Vec3(Dims.RING_D, 1f, Dims.RING_D))
+        ghostGlow.material(m.ghost(cct))
+        ghostGlow.place(Vec3(at.x, y - 0.0015f, at.z), Vec3(Dims.GLOW_D, 1f, Dims.GLOW_D))
+        ring.place(Vec3(at.x, y - 0.002f, at.z), Vec3(Dims.RETICLE_RING_D * 1.6f, 1f, Dims.RETICLE_RING_D * 1.6f))
+    }
+
+    fun ceiling(at: Vec3, next: LampParams) {
+        ghost(at, at.y, next.cct)
         dot.show(false)
         pole.hide()
+        ghostPool.show(false)
         cross.forEach { it.hide() }
     }
 
-    fun surface(at: Vec3, ceilingY: Float, viewer: Vec3) {
+    fun surface(at: Vec3, ceilingY: Float, viewer: Vec3, next: LampParams) {
         dot.place(Vec3(at.x, at.y + 0.004f, at.z), Vec3(Dims.RETICLE_DOT_D, 1f, Dims.RETICLE_DOT_D))
         pole.draw(Vec3(at.x, at.y + 0.05f, at.z), Vec3(at.x, ceilingY - 0.02f, at.z), 0.004f, (viewer - at).rejectFrom(Vec3.UP))
-        ring.place(Vec3(at.x, ceilingY - Dims.RING_BELOW - 0.0015f, at.z), Vec3(Dims.RETICLE_RING_D, 1f, Dims.RETICLE_RING_D))
+        ghost(at, ceilingY, next.cct)
+        val r = LightMath.poolRadius(next.beam, ceilingY - at.y)
+        ghostPool.material(m.poolDisc(next.cct))
+        ghostPool.place(Vec3(at.x, at.y + Dims.LAYER_ABOVE + 0.001f, at.z), Vec3(2f * r, 1f, 2f * r))
         cross.forEach { it.hide() }
     }
 
@@ -203,6 +221,13 @@ internal class ReticleView(root: Entity, meshes: LpMeshes, private val m: LpMate
         ring.show(false)
         dot.show(false)
         pole.hide()
+        hideGhost()
+    }
+
+    private fun hideGhost() {
+        ghostRing.show(false)
+        ghostGlow.show(false)
+        ghostPool.show(false)
     }
 
     fun hide() {
@@ -210,6 +235,7 @@ internal class ReticleView(root: Entity, meshes: LpMeshes, private val m: LpMate
         dot.show(false)
         pole.hide()
         cross.forEach { it.hide() }
+        hideGhost()
     }
 
     fun destroy() {
@@ -217,6 +243,9 @@ internal class ReticleView(root: Entity, meshes: LpMeshes, private val m: LpMate
         dot.destroy()
         pole.destroy()
         cross.forEach { it.destroy() }
+        ghostRing.destroy()
+        ghostGlow.destroy()
+        ghostPool.destroy()
     }
 }
 

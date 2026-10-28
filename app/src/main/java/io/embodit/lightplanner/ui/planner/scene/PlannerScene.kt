@@ -157,6 +157,9 @@ class PlannerScene(private val sink: (PlannerEvent) -> Unit) {
     }
 
     private var drag: Drag? = null
+
+    /** The controller ray this frame (taste profile D1), null without a tracked controller: the gaze stands in then. */
+    private var aim: Pair<Vec3, Vec3>? = null
     private var live: Pair<String, P2>? = null
     private var liveGuides: List<Pair<P2, P2>> = emptyList()
     private var stickTarget: String? = null
@@ -534,6 +537,7 @@ class PlannerScene(private val sink: (PlannerEvent) -> Unit) {
             pose = it
             hasHead = it.position.length > 1e-3f
         }
+        aim = stick.ray(now)
         val rig = rig ?: return
         rig.onFrame(now)
         rig.stowBehind(pose)
@@ -543,6 +547,7 @@ class PlannerScene(private val sink: (PlannerEvent) -> Unit) {
             // textures a few per frame (two on the idle emulator), never a burst
             work.run(if (frameIntervalMs > SLOW_FRAME_MS) SLOW_WORK_PER_FRAME else FAST_WORK_PER_FRAME)
             stepStick(now)
+            stepRayDrag(now)
             drawLive(now)
         }
         if (hasHead) placePanels(now)
@@ -625,7 +630,8 @@ class PlannerScene(private val sink: (PlannerEvent) -> Unit) {
             r.hide()
             return
         }
-        val hit = state.room.hitAny(pose.position, pose.forward, RETICLE_REACH_M)
+        val (origin, dir) = aim ?: (pose.position to pose.forward)
+        val hit = state.room.hitAny(origin, dir, RETICLE_REACH_M)
         if (hit == null) {
             r.hide()
             return
@@ -633,10 +639,10 @@ class PlannerScene(private val sink: (PlannerEvent) -> Unit) {
         val plane = hit.plane
         val xz = P2.of(hit.point)
         when {
-            state.room.isCeiling(plane) -> r.ceiling(hit.point)
+            state.room.isCeiling(plane) -> r.ceiling(hit.point, state.lastParams)
             plane.isHorizontal -> {
                 val cy = state.room.ceilingYAt(xz)
-                if (cy == null || cy <= hit.point.y + 0.2f) r.bad(hit.point, hit.normal) else r.surface(hit.point, cy, pose.position)
+                if (cy == null || cy <= hit.point.y + 0.2f) r.bad(hit.point, hit.normal) else r.surface(hit.point, cy, pose.position, state.lastParams)
             }
             else -> r.bad(hit.point, hit.normal)
         }
@@ -802,15 +808,26 @@ class PlannerScene(private val sink: (PlannerEvent) -> Unit) {
         }
         val lampId = lampOf(target)
         val handle = target != null && select?.ownsHandle(target) == true
-        val plane = planeOf(target)
+        var plane = planeOf(target)
+        var point = stage
+        // with a controller the lamp goes where the preview ghost was: the same ray x room computation (taste profile D1)
+        val ray = aim
+        var via = "tap"
+        if (lampId == null && !handle && ray != null) {
+            ui.room.hitAny(ray.first, ray.second, RETICLE_REACH_M)?.let {
+                plane = it.plane
+                point = it.point
+                via = "ray"
+            }
+        }
         val hit: Hit =
             when {
                 lampId != null -> Hit.Lamp(lampId)
                 handle -> Hit.Handle(ui.dragging ?: ui.selected ?: "")
-                plane != null && stage != null -> Hit.Surface(stage, plane)
+                plane != null && point != null -> Hit.Surface(point, plane!!)
                 else -> Hit.Nothing
             }
-        LpLog.i("TAP target=$name hit=${hit::class.simpleName} stage=${LpLog.pos(stage)} head=${LpLog.pos(pose.position)}")
+        LpLog.i("TAP target=$name hit=${hit::class.simpleName} via=$via stage=${LpLog.pos(point)} head=${LpLog.pos(pose.position)}")
         sink(PlannerEvent.Pinched(hit))
     }
 
@@ -854,7 +871,8 @@ class PlannerScene(private val sink: (PlannerEvent) -> Unit) {
                 d.totalPx = Vec3(d.totalPx.x + a.x, d.totalPx.y + a.y, d.totalPx.z + a.z)
                 d.hand = handDelta(d.totalPx) ?: d.hand
                 if (!d.begun && d.hand.length >= DRAG_START_M) beginDrag(d)
-                if (d.begun) {
+                // with a controller the frame system moves the lamp along the ray (stepRayDrag)
+                if (d.begun && aim == null) {
                     val dir = d.dir ?: return
                     val turned = DragLine.turn(dir, d.hand - d.prevHand, d.equivalent, pose.right, pose.up, pose.forward)
                     d.prevHand = d.hand
@@ -887,6 +905,46 @@ class PlannerScene(private val sink: (PlannerEvent) -> Unit) {
                 endDrag(cancelled = phase == "cancel", id = d.id)
             }
         }
+    }
+
+    /**
+     * Dragging with a controller (taste profile D1, 0.1.1): the lamp follows the ray, the ring on the ceiling
+     * (ray x ceiling), the handle at its locked level (ray x that level). The head-line drag (DragLine) is the
+     * fallback for hands and the emulator, where there is no controller ray.
+     */
+    private fun stepRayDrag(now: Long) {
+        val d = drag ?: return
+        val ray = aim ?: return
+        if (!d.begun) return
+        val lamp = ui.lamp(d.id) ?: return
+        val xz: P2? =
+            if (d.handle) DragLine.onLevel(ray.first, ray.second, d.levelY, 8f)
+            else ui.room.hitCeiling(ray.first, ray.second)?.let { P2.of(it) }
+        if (xz != null) setLive(lamp, xz)
+        if (now - d.lastSendMs >= DRAG_SEND_MS) {
+            d.lastSendMs = now
+            live?.let { sink(PlannerEvent.DragMoved(d.id, it.second)) }
+        }
+        if (now - d.lastLogMs > 500) {
+            d.lastLogMs = now
+            LpLog.i("DRAG ray id=${d.id} live=${live?.second}")
+        }
+    }
+
+    /** Debug `ray`: aims the controller ray at the Stage point [at] from [from] (default: the head) for [ms]. */
+    fun debugRay(at: Vec3, from: Vec3?, ms: Long): String {
+        val o = from ?: pose.position
+        stick.debugAim(o, at - o, ms)
+        return "ray from=${LpLog.pos(o)} to=${LpLog.pos(at)} ms=$ms"
+    }
+
+    /** Debug `trigger`: the system tap a trigger press would deliver, through the controller ray. */
+    fun debugTrigger(): String {
+        val ray = aim ?: return "no ray"
+        val hit = ui.room.hitAny(ray.first, ray.second, RETICLE_REACH_M) ?: return "ray hits nothing"
+        LpLog.i("TAP target=debug-trigger hit=Surface via=ray stage=${LpLog.pos(hit.point)}")
+        sink(PlannerEvent.Pinched(Hit.Surface(hit.point, hit.plane)))
+        return "trigger at ${LpLog.pos(hit.point)}"
     }
 
     private fun beginDrag(d: Drag) {

@@ -142,4 +142,7 @@
     <string name="virtual_use">Use a virtual room</string>
     <string name="virtual_recenter">Move in front of me</string>
     <string name="status_lamps_virtual">%1$d lamps · virtual room %2$s</string>
+    <string name="action_mute">Mute sounds</string>
+    <string name="action_unmute">Turn sounds on</string>
+    <string name="lamp_front">Move in front of me</string>
 </resources>

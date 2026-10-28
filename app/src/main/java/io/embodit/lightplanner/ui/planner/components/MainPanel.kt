@@ -1,6 +1,9 @@
 package io.embodit.lightplanner.ui.planner.components
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -11,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -247,6 +251,10 @@ private fun ColumnScope.PlanView(state: PlannerUiState, onEvent: (PlannerEvent) 
     val holeOpen = state.popup == Popup.HOLE_PLAN
     Row(modifier = Modifier.fillMaxWidth().height(RowH), verticalAlignment = Alignment.CenterVertically) {
         Text(text = rs(if (holeOpen) R.string.title_hole_open else R.string.title), color = ink, style = LpType.title, maxLines = 1, modifier = Modifier.weight(1f).probe("title"))
+        // mute in sight on the main panel, not in the settings (taste profile D15)
+        val sound = state.settings.sound
+        Key(name = "sound", icon = if (sound) R.drawable.ic_sound_on else R.drawable.ic_sound_off, description = rs(if (sound) R.string.action_mute else R.string.action_unmute), enabled = true) { onEvent(PlannerEvent.SoundToggled) }
+        Spacer(modifier = Modifier.width(8.dp))
         Key(name = "settings", icon = R.drawable.ic_settings, description = rs(R.string.action_settings), enabled = true) { onEvent(PlannerEvent.SettingsClicked) }
     }
     Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -257,7 +265,8 @@ private fun ColumnScope.PlanView(state: PlannerUiState, onEvent: (PlannerEvent) 
     if (state.heat) {
         Legend()
     } else {
-        Text(text = rs(if (state.lamps.isEmpty()) R.string.hint_empty else R.string.hint_planning), color = ink, style = LpType.hint, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.probe("hint"))
+        Text(text = rs(if (state.lamps.isEmpty()) R.string.hint_empty else R.string.hint_planning), color = ink, style = LpType.hint, maxLines = if (state.lamps.isEmpty()) 2 else 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.probe("hint"))
+        if (state.lamps.isNotEmpty() && !holeOpen) LampList(state, onEvent)
     }
     Spacer(modifier = Modifier.weight(1f))
     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -349,6 +358,28 @@ private fun ColumnScope.LampView(state: PlannerUiState, onEvent: (PlannerEvent) 
     Text(text = line, color = ink, style = LpType.status, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.probe("lamp_distances"))
     Text(text = rs(R.string.hint_stick), color = grey, style = LpType.label, maxLines = 1, modifier = Modifier.probe("hint_stick"))
     Footer(state, onEvent)
+}
+
+// ---- lamp list (0.1.1) ---------------------------------------------------------------------------
+
+/** Every lamp, by number: pick a row to select it, bring it in front of you, or delete it (audit: no object list). */
+@Composable
+private fun LampList(state: PlannerUiState, onEvent: (PlannerEvent) -> Unit) {
+    val ink = PicoTheme.colorScheme.labelPrimary
+    val grey = PicoTheme.colorScheme.labelSecondary
+    Column(modifier = Modifier.fillMaxWidth().heightIn(max = 138.dp).verticalScroll(rememberScrollState()).probe("lamp_list"), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        for (l in state.lamps.sortedBy { it.no }) {
+            Row(modifier = Modifier.fillMaxWidth().height(42.dp).clip(RoundedCornerShape(21.dp)).background(PicoTheme.colorScheme.fillTertiary).padding(start = 12.dp, end = 2.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(modifier = Modifier.weight(1f).fillMaxHeight().clickable { onEvent(PlannerEvent.LampListSelected(l.id)) }.probe("list_${l.no}"), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(text = "${l.no}", color = ink, style = LpType.status, maxLines = 1)
+                    Dot(l.cct, 10.dp)
+                    Text(text = "${beamName(l.beam)} ${l.beam.deg.toInt()}° · ${lightName(l.cct)}", color = grey, style = LpType.label, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+                Key(name = "front_${l.no}", icon = R.drawable.ic_front, description = rs(R.string.lamp_front), enabled = true, width = 44.dp) { onEvent(PlannerEvent.LampToFront(l.id)) }
+                Key(name = "delete_${l.no}", icon = R.drawable.ic_trash, description = rs(R.string.action_delete), enabled = true, width = 44.dp) { onEvent(PlannerEvent.LampListDelete(l.id)) }
+            }
+        }
+    }
 }
 
 // ---- light colour ------------------------------------------------------------------------------

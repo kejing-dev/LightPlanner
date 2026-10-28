@@ -161,6 +161,13 @@ sealed interface PlannerEvent {
 
     data object DeleteClicked : PlannerEvent
 
+    /** The lamp list on the main panel (0.1.1): pick a row, bring that lamp in front of the user, delete it. */
+    data class LampListSelected(val id: String) : PlannerEvent
+
+    data class LampToFront(val id: String) : PlannerEvent
+
+    data class LampListDelete(val id: String) : PlannerEvent
+
     data object UndoClicked : PlannerEvent
 
     data object DoneClicked : PlannerEvent
@@ -176,6 +183,9 @@ sealed interface PlannerEvent {
     data class LanguageSelected(val language: LanguagePref) : PlannerEvent
 
     data class ShowSpacingToggled(val on: Boolean) : PlannerEvent
+
+    /** The main panel's mute key (taste profile D15). */
+    data object SoundToggled : PlannerEvent
 
     data object ClearClicked : PlannerEvent
 
