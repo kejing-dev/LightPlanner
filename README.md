@@ -4,6 +4,6 @@
 
 | 会话 | 标题 | 行数 |
 |---|---|---|
-| `5b446223` | [light-planner] design · 灯光布点 | 1105 |
 | `a44a7795` | [light-planner] build · 灯光布点 文字朝向 + 面板高度 + 光色 | 1939 |
 | `c0766393` | [light-planner] 发布 v0.1.2 · GitHub + 飞书 + Vibe Lab 素材 | 848 |
+| `5b446223` | [light-planner] design · 灯光布点 | 1105 |
